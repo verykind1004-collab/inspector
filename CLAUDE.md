@@ -95,9 +95,10 @@
 
 ## G. 실행 / 검증
 
-- 빌드: `java/` 에서 `./gradlew build`
-- 테스트: `./gradlew test`
+- 빌드: `java/` 에서 `./mvnw -B -ntp package`
+- 테스트: `java/` 에서 `./mvnw -B -ntp test`
 - 게이트: 컴파일 + 테스트 통과를 "변경 완료"의 기준으로 한다.
+- 빌드 환경: `JAVA_HOME=/home/inspector/jdk8u422-b05`. 서버에 maven 미설치 — wrapper(`./mvnw`)가 자동 다운로드(only-script). 최초 부트스트랩에 `/tmp/apache-maven-3.9.9` 사용.
 
 ## H. 금지 사항
 

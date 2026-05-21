@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.18</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.exem</groupId>
+    <artifactId>inspector</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>MaxGauge Inspector</name>
+    <description>MaxGauge Inspector Labs - Java rewrite (extensible DB analysis-screen platform)</description>
+
+    <properties>
+        <!-- JDK 8 고정 (CLAUDE.md C절 확정) -->
+        <java.version>8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <mybatis-spring-boot.version>2.3.2</mybatis-spring-boot.version>
+        <postgresql.version>42.7.4</postgresql.version>
+        <ojdbc8.version>21.11.0.0</ojdbc8.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 인증/보안 일괄 적용 (I절 규약 — 화면별 수동 인증 금지) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- DB 추상화: MyBatis(databaseId 분기) + HikariCP(starter-jdbc 전이) -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>${mybatis-spring-boot.version}</version>
+        </dependency>
+
+        <!-- JDBC 드라이버 (런타임). 접속 정보는 service_config.json 에서 동적 로딩 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc8</artifactId>
+            <version>${ojdbc8.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

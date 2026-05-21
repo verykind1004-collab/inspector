@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: inspector
+  # 리포지토리 접속 정보는 service_config.json 에서 런타임 동적 로딩 →
+  # 기본 DataSource 자동설정 미사용(InspectorApplication 에서 DataSourceAutoConfiguration 제외).
+
+server:
+  port: 8083   # 기존 Python Inspector 기본 포트(UTILS_PORT) 유지
+  servlet:
+    session:
+      timeout: 3600s   # idle 기준. auth.py 의 절대 만료(슬라이딩 없음)와는 다름 — 절대만료는 TODO
+
+inspector:
+  # 리포지토리 접속정보(service_config.json) 경로. 환경변수로 외부 경로 지정 가능.
+  # 기본값 위치에 파일이 없으면 미설정 상태로 기동(DataSource 미생성).
+  service-config-path: ${INSPECTOR_SERVICE_CONFIG:config/service_config.json}
+  auth:
+    # 관리자 고정 자격증명(auth.py 상수). 운영에서 재정의 권장.
+    admin-user: maxgauge
+    salt: mxg_inspector_salt_v1
+    admin-hash: ffb3ac5ee5445547dc04b542cf7d329efeb0178de4148c2ec8a9a877fb3ed316
+
+# 매퍼 위치/네이밍 규약. SqlSessionFactory 는 동적 DataSource 구성 후 활성화된다.
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
