@@ -1,0 +1,59 @@
+# ─── bundled binaries (드라이버 / nginx) ─────────────────────────────────────
+# install 시 drivers/install.sh 가 python-build-standalone 으로 자동 다운로드.
+# nginx 는 bundled 바이너리 사용 (별도 배포 채널).
+Labs/drivers/python3/
+Labs/Inspector/gateway/bin/
+
+# ─── 런타임 산출물 ───────────────────────────────────────────────────────────
+Labs/Inspector/gateway/log/
+Labs/Inspector/gateway/tmp/
+Labs/Inspector/gateway/nginx.conf
+Labs/Inspector/python-utils/log/
+Labs/Inspector/python-utils/server.log
+Labs/Inspector/python-utils/server.pid
+Labs/MaxSpace/log/
+Labs/MaxSpace/server.pid
+
+# 단, .gitkeep 은 디렉토리 자리 잡기용으로 트래킹 유지
+!Labs/Inspector/gateway/log/access/.gitkeep
+!Labs/Inspector/gateway/tmp/.gitkeep
+!Labs/Inspector/python-utils/log/IH/.gitkeep
+!Labs/MaxSpace/log/.gitkeep
+
+# ─── SSL 인증서 (사이트별로 생성) ────────────────────────────────────────────
+Labs/Inspector/gateway/ssl/*.crt
+Labs/Inspector/gateway/ssl/*.key
+Labs/Inspector/gateway/ssl/*.pem
+!Labs/Inspector/gateway/ssl/.gitkeep
+
+# ─── 백업 / 임시 파일 ────────────────────────────────────────────────────────
+*.bak
+*.bak_*
+*.backup
+*.orig
+*.swp
+*.swo
+*~
+
+# ─── Python 캐시 ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ─── 시크릿 / 환경별 설정 (템플릿만 커밋, 실제 값 금지) ──────────────────────
+# 만약 실수로 채워진 채 커밋하지 않도록 안전망. 의도적으로 비어있는 템플릿을
+# 강제로 커밋하려면 `git add -f` 사용.
+# Labs/Inspector/python-utils/service_config.json
+# Labs/Inspector/python-utils/insp_config.json
+
+# ─── IDE / OS ────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ─── 데이터 / 사용자 첨부 ────────────────────────────────────────────────────
+Labs/Inspector/python-utils/data/*
+!Labs/Inspector/python-utils/data/.gitkeep

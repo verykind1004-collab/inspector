@@ -1,0 +1,30 @@
+# MaxGauge Inspector Labs — gateway + python-utils + MaxSpace configuration.
+# 고객 환경에 맞춰 포트 / labs.dir 를 조정하세요. MaxGauge PJS 와 충돌하지 않도록.
+
+gateway:
+  port: 8080
+  ssl_enabled: false
+  ssl_port: 8443
+  ssl_cert:
+  ssl_key:
+
+platformjs:
+  port: 8081
+  base_path: "/MAXGAUGE"
+
+python_utils:
+  port: 8082
+  check_path: "/utils"
+
+java:
+  # Optional. 절대 경로 (예: /opt/jdk17/bin/java). 비워두면 bash login shell 의
+  # JAVA_HOME / PATH 를 통해 자동 탐색합니다.
+  path: ""
+
+tablespace:
+  port: 8083
+
+# 이 Labs/ 디렉토리의 절대 경로. 설치 시 반드시 채워주세요.
+# 예: /home/inspector/ORACLE/2407/Labs
+labs:
+  dir: ""

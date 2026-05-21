@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaxGauge Labs</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%25%27 stop-color=%27%236366F1%27/%3E%3Cstop offset=%27100%25%27 stop-color=%27%238B5CF6%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27url(%23g)%27/%3E%3Ccircle cx=%2714%27 cy=%2714%27 r=%275.5%27 fill=%27none%27 stroke=%27white%27 stroke-width=%272.5%27/%3E%3Cline x1=%2718%27 y1=%2718%27 x2=%2724%27 y2=%2724%27 stroke=%27white%27 stroke-width=%272.5%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    color: #1a1d2e;
+  }
+
+  .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .logo-icon {
+    width: 54px; height: 54px;
+    background: #6c54e8; border-radius: 12px;
+    display: grid; place-items: center;
+  }
+  .logo-name {
+    font-size: 36px; font-weight: 700;
+    color: #1a1d2e; letter-spacing: -0.01em;
+  }
+  .logo-name span { color: #1a1d2e; }
+
+  .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+  .screen.active { display: flex; }
+
+  /* 로그인 */
+  .login-box { width: 100%; max-width: 380px; margin-top: 40px; }
+  .login-desc {
+    font-size: 13.5px; color: #9ca3af;
+    text-align: center; margin-bottom: 28px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: #6b7280; margin-bottom: 6px; letter-spacing: 0.02em;
+  }
+  .field input {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid #e4e6ed; border-radius: 10px;
+    font-size: 14px; font-family: 'Inter', sans-serif;
+    color: #1a1d2e; outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    background: #fafafa;
+  }
+  .field input:focus {
+    border-color: #6c54e8;
+    box-shadow: 0 0 0 3px rgba(108,84,232,0.1);
+    background: #fff;
+  }
+  .login-btn {
+    width: 100%; margin-top: 8px; padding: 13px;
+    background: #6c54e8; color: #fff;
+    border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+    font-family: 'Inter', sans-serif; cursor: pointer;
+    transition: background 0.18s, transform 0.15s;
+  }
+  .login-btn:hover { background: #5a43d0; transform: translateY(-1px); }
+  .login-btn:active { transform: translateY(0); }
+  .login-btn[disabled] { background: #c3b9f0; cursor: wait; transform: none; }
+  .login-error {
+    margin-top: 12px; font-size: 13px;
+    color: #ef4444; text-align: center;
+    min-height: 20px; font-weight: 500;
+  }
+
+  /* 모듈 선택 */
+  .subtitle {
+    font-size: 16px; color: #9ca3af;
+    margin-bottom: 60px; text-align: center;
+  }
+  .topbar-area {
+    position: fixed; top: 18px; right: 24px;
+    display: flex; align-items: center; gap: 10px; z-index: 20;
+  }
+  .user-badge { font-size: 12px; color: #9ca3af; font-weight: 500; }
+  .user-badge strong { color: #6c54e8; }
+  .logout-btn {
+    font-size: 12px; font-weight: 500; color: #9ca3af;
+    background: none; border: 1px solid #e4e6ed;
+    border-radius: 7px; padding: 5px 12px; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .logout-btn:hover { color: #ef4444; border-color: #ef4444; }
+
+  /* Cards */
+  .cards { display: grid; gap: 22px; justify-content: center; }
+  .cards.one-col   { grid-template-columns: 340px; }
+  .cards.two-col   { grid-template-columns: repeat(2, 340px); }
+  .cards.three-col { grid-template-columns: repeat(3, 340px); }
+
+  .card {
+    background: #ffffff; border: 1.5px solid #e4e6ed;
+    border-radius: 16px; padding: 44px 34px 36px;
+    cursor: pointer;
+    transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+    text-decoration: none; color: inherit;
+    display: block; position: relative;
+  }
+  .card::after {
+    content: ''; position: absolute;
+    top: 0; left: 16px; right: 16px;
+    height: 2px; background: #6c54e8;
+    border-radius: 0 0 3px 3px;
+    opacity: 0; transition: opacity 0.18s;
+  }
+  .card:hover {
+    border-color: #6c54e8;
+    box-shadow: 0 8px 28px rgba(108,84,232,0.13);
+    transform: translateY(-2px);
+  }
+  .card:hover::after { opacity: 1; }
+
+  .card-icon {
+    width: 68px; height: 68px; background: #ede9fd;
+    border-radius: 14px; display: grid; place-items: center;
+    margin-bottom: 28px; transition: background 0.18s;
+  }
+  .card:hover .card-icon { background: #6c54e8; }
+  .card-icon svg {
+    width: 32px; height: 32px; stroke: #6c54e8;
+    fill: none; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+    transition: stroke 0.18s;
+  }
+  .card:hover .card-icon svg { stroke: #fff; }
+  .card-name { font-size: 20px; font-weight: 700; color: #1a1d2e; margin-bottom: 10px; }
+  .card-desc { font-size: 15px; color: #6b7280; line-height: 1.6; }
+
+  /* Inspector iframe 풀뷰 */
+  #screen-inspector {
+    position: fixed; inset: 0;
+    background: #ffffff; padding: 0;
+    display: none; z-index: 30;
+  }
+  #screen-inspector.active { display: block; }
+  #inspector-frame {
+    width: 100%; height: 100vh;
+    border: 0; display: block;
+  }
+
+  /* FAB */
+  .fab {
+    position: fixed; bottom: 28px; right: 28px;
+    width: 48px; height: 48px;
+    background: #ffffff; border: 1.5px solid #e4e6ed;
+    border-radius: 50%;
+    display: grid; place-items: center; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+    z-index: 50;
+  }
+  .fab:hover {
+    border-color: #6c54e8;
+    box-shadow: 0 6px 24px rgba(108,84,232,0.18);
+    transform: scale(1.08);
+  }
+  .fab:hover svg { stroke: #6c54e8; }
+  .fab svg {
+    width: 20px; height: 20px; stroke: #9ca3af;
+    fill: none; stroke-width: 1.8; stroke-linecap: round;
+    transition: stroke 0.18s;
+  }
+
+  /* Tablespace iframe 진입 중에는 FAB 숨김 */
+  body.tablespace-open .fab,
+  body.inspector-open .fab { display: none; }
+
+  /* 로그인 화면일 때 (=인증 전) Configuration FAB 숨김 */
+  #screen-login.active ~ .fab { display: none; }
+
+  /* iframe 위에 얹는 플로팅 Back 버튼 */
+  .iframe-floating-back {
+    position: fixed;
+    top: 12px; right: 18px;
+    z-index: 40;
+    display: none;
+    padding: 7px 14px;
+    font-size: 12px; font-weight: 600;
+    color: #6c54e8;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1.5px solid #e4e6ed;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .iframe-floating-back:hover { background: #faf9ff; border-color: #6c54e8; }
+
+  /* Config 모달 */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(20, 20, 40, 0.45);
+    backdrop-filter: blur(4px);
+    display: none; z-index: 100;
+    overflow-y: auto; padding: 32px 24px;
+  }
+  .modal-backdrop.active { display: block; }
+  .modal {
+    background: #f4f5f8; border-radius: 16px;
+    width: 100%; max-width: 820px; margin: 0 auto;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    overflow: hidden;
+  }
+  .modal-head {
+    background: #fff;
+    padding: 18px 28px;
+    border-bottom: 1px solid #e4e6ed;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .modal-head h2 {
+    font-size: 18px; font-weight: 700;
+    color: #1a1d2e; letter-spacing: -0.01em;
+  }
+  .modal-close {
+    width: 32px; height: 32px;
+    border: 1.5px solid #e4e6ed; border-radius: 8px;
+    background: #fff;
+    display: grid; place-items: center;
+    cursor: pointer; font-size: 14px; color: #9ca3af;
+    line-height: 1; transition: border-color 0.15s, color 0.15s;
+  }
+  .modal-close:hover { border-color: #ef4444; color: #ef4444; }
+
+  .modal-body {
+    padding: 24px 28px 32px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* Section card */
+  .cfg-section {
+    background: #fff;
+    border: 1px solid #e4e6ed; border-radius: 12px;
+    overflow: hidden;
+  }
+  .cfg-section-header {
+    background: #eef0f7;
+    padding: 11px 22px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6c54e8;
+  }
+  .cfg-section-body { padding: 22px 22px 18px; }
+
+  /* Form */
+  .form-row { display: flex; gap: 14px; margin-bottom: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .form-group.full { flex: 1 1 100%; }
+  .form-group label {
+    font-size: 11.5px; font-weight: 600;
+    color: #6b7280; letter-spacing: 0.02em;
+  }
+  .form-group input,
+  .form-group select {
+    padding: 8px 12px;
+    border: 1.5px solid #e4e6ed; border-radius: 8px;
+    font-size: 13px; font-family: 'Inter', sans-serif;
+    color: #1a1d2e; outline: none;
+    background: #fafafa;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #6c54e8;
+    box-shadow: 0 0 0 3px rgba(108,84,232,0.1);
+    background: #fff;
+  }
+  .form-group select { cursor: pointer; }
+
+  .btn-row {
+    display: flex; justify-content: flex-end;
+    gap: 10px; margin-top: 6px; align-items: center;
+  }
+  .btn-row .msg {
+    margin-right: auto;
+    font-size: 12px; font-weight: 500;
+    color: #10b981;
+  }
+  .btn-row .msg.err { color: #ef4444; }
+  .btn-row .msg.info { color: #6c54e8; }
+
+  .btn-outline {
+    padding: 7px 18px;
+    border: 1.5px solid #6c54e8; border-radius: 8px;
+    font-size: 12.5px; font-weight: 600;
+    color: #6c54e8; background: #fff; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.15s;
+  }
+  .btn-outline:hover { background: #ede9fd; }
+  .btn-outline[disabled] { opacity: 0.6; cursor: wait; }
+
+  .btn-primary {
+    padding: 7px 22px;
+    border: none; border-radius: 8px;
+    font-size: 12.5px; font-weight: 700;
+    color: #fff; background: #6c54e8; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.04em;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: #5a43d0; }
+  .btn-primary[disabled] { background: #c3b9f0; cursor: wait; }
+
+  .btn-danger {
+    padding: 7px 18px;
+    border: 1.5px solid #ef4444; border-radius: 8px;
+    font-size: 12.5px; font-weight: 600;
+    color: #ef4444; background: #fff; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.15s;
+  }
+  .btn-danger:hover { background: #fef2f2; }
+
+  /* Collapsible */
+  .collapsible { border-top: 1px solid #f0f1f5; }
+  .collapsible-toggle {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    padding: 12px 22px;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: #6c54e8; text-align: left;
+    transition: background 0.15s;
+  }
+  .collapsible-toggle:hover { background: #faf9ff; }
+  .collapsible-toggle .arrow { transition: transform 0.2s; font-size: 9px; }
+  .collapsible-toggle.open .arrow { transform: rotate(90deg); }
+  .collapsible-content { display: none; padding: 4px 22px 18px; }
+  .collapsible-content.open { display: block; }
+
+  /* Switch (toggle) */
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: 12px;
+    background: #cbd5e1; transition: background 0.2s;
+  }
+  .switch .knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    transition: left 0.2s;
+  }
+  .switch input:checked + .track { background: #6c54e8; }
+  .switch input:checked + .track + .knob { left: 22px; }
+
+  /* DGServer dynamic rows */
+  .dgserver-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .dgserver-row { display: flex; gap: 8px; align-items: center; }
+  .dgserver-row input {
+    flex: 1; padding: 8px 12px;
+    border: 1.5px solid #e4e6ed; border-radius: 8px;
+    font-size: 13px; font-family: 'Inter', sans-serif;
+    color: #1a1d2e; outline: none;
+    background: #fafafa;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .dgserver-row input:focus {
+    border-color: #6c54e8;
+    box-shadow: 0 0 0 3px rgba(108,84,232,0.1);
+    background: #fff;
+  }
+  .btn-remove {
+    width: 30px; height: 30px;
+    border: 1.5px solid #e4e6ed; border-radius: 7px;
+    background: #fff; color: #9ca3af;
+    font-size: 16px; cursor: pointer;
+    display: grid; place-items: center; flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-remove:hover { border-color: #ef4444; color: #ef4444; }
+  .btn-add-dg {
+    width: 100%; padding: 9px;
+    border: 1.5px dashed #c4b8f5; border-radius: 8px;
+    background: #faf9ff; color: #6c54e8;
+    font-size: 12.5px; font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-add-dg:hover { background: #ede9fd; border-color: #6c54e8; }
+
+  /* Connection Test popup */
+  .ct-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.4);
+    align-items: center; justify-content: center;
+  }
+  .ct-overlay.active { display: flex; }
+  .ct-box {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+    min-width: 520px; max-width: 640px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.15);
+    overflow: hidden;
+  }
+  .ct-head {
+    padding: 18px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ct-head-left { display: flex; align-items: center; gap: 10px; }
+  .ct-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 10px rgba(99,102,241,.4);
+  }
+  .ct-title { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: 0.02em; }
+  .ct-close {
+    background: none; border: none; font-size: 16px;
+    color: #64748b; cursor: pointer;
+    transition: color 0.15s;
+  }
+  .ct-close:hover { color: #0f172a; }
+  .ct-body { padding: 20px 24px; max-height: 60vh; overflow-y: auto; }
+  .ct-loading { color: #94a3b8; font-size: 13px; text-align: center; padding: 20px 0; }
+  .ct-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+  }
+  .ct-table thead th {
+    background: #ecf0f7; color: #5f6b80;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 14px; text-align: center;
+    border-bottom: 1px solid #d8dee8;
+  }
+  .ct-table tbody td {
+    padding: 11px 14px; text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .ct-table tbody tr:last-child td { border-bottom: none; }
+  .ct-table td.comp { font-weight: 600; color: #0f172a; }
+  .ct-table td.detail { color: #64748b; font-size: 12.5px; }
+  .ct-pill {
+    padding: 3px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    display: inline-block;
+  }
+  .ct-pill.ok   { background: #f0fdf4; color: #15803d; border: 1px solid rgba(22,163,74,.2); }
+  .ct-pill.fail { background: #fef2f2; color: #dc2626; border: 1px solid rgba(220,38,38,.2); }
+  .ct-pill.skip { background: rgba(100,116,139,.12); color: #64748b; border: 1px solid rgba(100,116,139,.2); }
+
+  /* Schedule table (read-only info) */
+  .sched-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+  }
+  .sched-table thead th {
+    background: #ecf0f7; color: #5f6b80;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 14px; text-align: center;
+    border-bottom: 1px solid #d8dee8;
+  }
+  .sched-table tbody td {
+    padding: 9px 14px; text-align: center;
+    color: #374151; border-bottom: 1px solid #f0f1f5;
+  }
+  .sched-table tbody tr:last-child td { border-bottom: none; }
+  .sched-table tbody td.name { text-align: left; font-weight: 600; color: #1a1d2e; }
+  .sched-table tbody td.interval { color: #6c54e8; font-weight: 600; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .anim   { animation: fadeUp 0.4s ease both; }
+  .anim-1 { animation: fadeUp 0.4s 0.05s ease both; }
+  .anim-2 { animation: fadeUp 0.4s 0.10s ease both; }
+
+  @media (max-width: 820px) {
+    .cards.one-col, .cards.two-col, .cards.three-col { grid-template-columns: 1fr; width: 100%; max-width: 340px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<div class="screen active" id="screen-login">
+  <div class="logo anim">
+    <div class="logo-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10.5" cy="10.5" r="6.5"/>
+        <line x1="15.5" y1="15.5" x2="20" y2="20"/>
+      </svg>
+    </div>
+    <div class="logo-name">Max<span>Gauge</span> Labs</div>
+  </div>
+
+  <div class="login-box anim-1">
+    <p class="login-desc">계정 정보를 입력하여 로그인하세요</p>
+
+    <form id="login-form" autocomplete="off">
+      <div class="field">
+        <label>아이디</label>
+        <input type="text" id="inp-id" placeholder="아이디 입력" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>비밀번호</label>
+        <input type="password" id="inp-pw" placeholder="비밀번호 입력" autocomplete="current-password" />
+      </div>
+      <button type="submit" class="login-btn" id="btn-login">로그인</button>
+    </form>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- 모듈 선택 화면 -->
+<div class="screen" id="screen-main">
+
+  <div class="topbar-area">
+    <span class="user-badge" id="user-badge"></span>
+    <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+  </div>
+
+  <div class="logo anim">
+    <div class="logo-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10.5" cy="10.5" r="6.5"/>
+        <line x1="15.5" y1="15.5" x2="20" y2="20"/>
+      </svg>
+    </div>
+    <div class="logo-name">Max<span>Gauge</span> Labs</div>
+  </div>
+
+  <p class="subtitle anim-1">접속할 모듈을 선택하세요</p>
+
+  <div class="cards anim-2" id="card-grid">
+
+    <a class="card" href="#" onclick="openTablespace(); return false;">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.657-4.03 3-9 3s-9-1.343-9-3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/></svg>
+      </div>
+      <div class="card-name">MaxSpace</div>
+      <p class="card-desc">테이블스페이스 추이 조회</p>
+    </a>
+
+    <a class="card" id="card-inspector" href="#" onclick="openInspector(); return false;" style="display:none;">
+      <div class="card-icon">
+        <svg width="44" height="44" viewBox="0 0 32 32"><polyline points="26 16 22 16 19 25 13 7 10 16 6 16" stroke-width="3"/></svg>
+      </div>
+      <div class="card-name">Inspector</div>
+      <p class="card-desc">MaxGauge 유지보수 서비스</p>
+    </a>
+
+  </div>
+
+</div>
+
+<!-- Inspector iframe 화면 (Inspector 는 자체 헤더에 Labs 버튼 있음) -->
+<div id="screen-inspector">
+  <button class="iframe-floating-back" onclick="closeInspector()">&larr; Labs</button>
+  <iframe id="inspector-frame" src="about:blank"></iframe>
+</div>
+
+<!-- FAB (Configuration) -->
+<div class="fab" onclick="openConfig()" title="Configuration">
+  <svg viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+  </svg>
+</div>
+
+<!-- Configuration 모달 -->
+<div class="modal-backdrop" id="config-modal" onmousedown="_ovMd(event)" onclick="_ovClick(event, closeConfig)">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Configuration</h2>
+      <button class="modal-close" onclick="closeConfig()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- ① REPOSITORY DATABASE -->
+      <div class="cfg-section">
+        <div class="cfg-section-header">Repository Database</div>
+        <div class="cfg-section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>DB Type</label>
+              <select id="cfg-db-type">
+                <option value="PostgreSQL">PostgreSQL</option>
+                <option value="Oracle">Oracle</option>
+              </select>
+            </div>
+            <div class="form-group"><label>SID / Database</label><input type="text" id="cfg-sid"></div>
+            <div class="form-group"><label>Port</label><input type="text" id="cfg-port"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full"><label>IP</label><input type="text" id="cfg-ip"></div>
+          </div>
+          <div class="form-row" id="cfg-pg-home-row">
+            <div class="form-group full"><label>PostgreSQL Home Path</label><input type="text" id="cfg-pg-home"></div>
+          </div>
+          <div class="form-row" id="cfg-pg-data-row">
+            <div class="form-group full"><label>Data Directory</label><input type="text" id="cfg-pg-data-dir"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>DB User</label><input type="text" id="cfg-user"></div>
+            <div class="form-group"><label>DB Password</label><input type="password" id="cfg-password"></div>
+          </div>
+          <div class="btn-row">
+            <span class="msg" id="repo-msg"></span>
+            <button class="btn-outline" id="repo-test" onclick="testConnection()">Connection Test</button>
+            <button class="btn-primary" id="repo-save" onclick="saveRepo()">SAVE</button>
+          </div>
+        </div>
+
+        <!-- Collection Settings -->
+        <div class="collapsible">
+          <button class="collapsible-toggle" onclick="toggleCollapse(this)">
+            <span class="arrow">▶</span> Collection Settings
+          </button>
+          <div class="collapsible-content">
+            <div class="form-row" style="align-items:center;gap:16px;">
+              <label style="font-size:12px;font-weight:600;color:#6b7280;min-width:130px;">Data Collection</label>
+              <label class="switch">
+                <input type="checkbox" id="ih-enabled">
+                <span class="track"></span><span class="knob"></span>
+              </label>
+              <span id="ih-enabled-label" style="font-size:13px;font-weight:600;color:#94a3b8;">OFF</span>
+            </div>
+            <div class="form-row" style="align-items:center;gap:16px;">
+              <label style="font-size:12px;font-weight:600;color:#6b7280;min-width:130px;">Retention Period</label>
+              <input type="number" id="ih-retention" min="1" max="365" style="width:90px;padding:8px 12px;border:1.5px solid #e4e6ed;border-radius:8px;font-size:13px;background:#fafafa;outline:none;text-align:center;">
+              <span style="font-size:12px;color:#6b7280;">days (INSP_ partitions)</span>
+            </div>
+            <div class="form-row" style="align-items:center;gap:16px;">
+              <label style="font-size:12px;font-weight:600;color:#6b7280;min-width:130px;">Log Retention</label>
+              <input type="number" id="ih-log-retention" min="1" max="365" style="width:90px;padding:8px 12px;border:1.5px solid #e4e6ed;border-radius:8px;font-size:13px;background:#fafafa;outline:none;text-align:center;">
+              <span style="font-size:12px;color:#6b7280;">days (IH / nginx log files)</span>
+            </div>
+            <div class="btn-row">
+              <span class="msg" id="ih-msg"></span>
+              <button class="btn-primary" onclick="saveInspConfig()">Save Settings</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collection Schedule -->
+        <div class="collapsible">
+          <button class="collapsible-toggle" onclick="toggleCollapse(this)">
+            <span class="arrow">▶</span> Collection Schedule
+          </button>
+          <div class="collapsible-content">
+            <table class="sched-table">
+              <thead><tr>
+                <th>수집 지표</th><th>수집 주기</th><th>수집 테이블</th>
+              </tr></thead>
+              <tbody>
+                <tr><td class="name">OS CPU / Memory</td><td class="interval">매 1분</td><td>insp_os_history</td></tr>
+                <tr><td class="name">DGServer Heap</td><td class="interval">매 1분</td><td>insp_heap_history</td></tr>
+                <tr><td class="name">DGServer QCnt</td><td class="interval">매 1분</td><td>insp_qcnt_history</td></tr>
+                <tr><td class="name">Service Status</td><td class="interval">매 시간 :00</td><td>insp_service_history</td></tr>
+                <tr><td class="name">Summary 10min</td><td class="interval">매 10분 (m%10==5)</td><td>insp_summary_history</td></tr>
+                <tr><td class="name">Summary 1hour</td><td class="interval">매 시간 :30</td><td>insp_summary_history</td></tr>
+                <tr><td class="name">Tablespace / Disk</td><td class="interval">매일 23:50</td><td>insp_tbs_history</td></tr>
+                <tr><td class="name">Partition 생성</td><td class="interval">매일 23:50</td><td>D+1, D+2</td></tr>
+                <tr><td class="name">Monthly Summary</td><td class="interval">매월 1일 00:10</td><td>insp_monthly_summary</td></tr>
+                <tr><td class="name">Retention Cleanup</td><td class="interval">매일 00:05</td><td>(전체 INSP_ 파티션)</td></tr>
+                <tr><td class="name">Log Rotation</td><td class="interval">매일 00:01 / 00:02</td><td>(nginx / IH 로그)</td></tr>
+              </tbody>
+            </table>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:10px;line-height:1.5;">
+              스케줄은 30초 루프로 고정되어 있으며, 수집 주기는 하드코딩입니다. 변경은 history.py 수정을 통해 가능합니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- Drop -->
+        <div class="collapsible">
+          <button class="collapsible-toggle" onclick="toggleCollapse(this)">
+            <span class="arrow">▶</span> Drop
+          </button>
+          <div class="collapsible-content">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+              <button class="btn-danger" onclick="dropInspTables()">Drop Inspector History Tables</button>
+            </div>
+            <div style="font-size:12px;color:#64748b;line-height:1.5;">
+              Inspector가 생성한 INSP_ 테이블 및 파티션을 전부 삭제합니다.<br>
+              재사용하려면 Inspector History 메뉴에서 다시 생성해야 합니다.
+            </div>
+            <div class="btn-row" style="margin-top:8px;"><span class="msg" id="drop-msg"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② SERVICE PATHS -->
+      <div class="cfg-section">
+        <div class="cfg-section-header">Service Paths</div>
+        <div class="cfg-section-body">
+          <div class="form-row">
+            <div class="form-group full"><label>PlatformJS Path</label><input type="text" id="cfg-platformjs"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full"><label>DGServer_M Path</label><input type="text" id="cfg-dgserver-m"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label>DGServer_Sn Paths</label>
+            <div class="dgserver-list" id="svc-dg-list"></div>
+            <button class="btn-add-dg" onclick="addDgRow('svc-dg-list')">+ Add DGServer_Sn</button>
+          </div>
+          <div class="btn-row">
+            <span class="msg" id="paths-msg"></span>
+            <button class="btn-primary" onclick="savePaths()">SAVE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connection Test 결과 팝업 -->
+      <div class="ct-overlay" id="ct-overlay" onmousedown="_ovMd(event)" onclick="_ovClick(event, closeConnTest)">
+        <div class="ct-box">
+          <div class="ct-head">
+            <div class="ct-head-left">
+              <div class="ct-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+              </div>
+              <span class="ct-title">Connection Test</span>
+            </div>
+            <button class="ct-close" onclick="closeConnTest()">✕</button>
+          </div>
+          <div class="ct-body" id="ct-body">
+            <div class="ct-loading">Ready</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ LOG PATHS -->
+      <div class="cfg-section">
+        <div class="cfg-section-header">Log Paths</div>
+        <div class="cfg-section-body">
+          <div class="form-row">
+            <div class="form-group full"><label>PlatformJS Log Path</label><input type="text" id="cfg-log-platformjs"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full"><label>DGServer_M Log Path</label><input type="text" id="cfg-log-dgserver-m"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label>DGServer_Sn Log Paths</label>
+            <div class="dgserver-list" id="log-dg-list"></div>
+            <button class="btn-add-dg" onclick="addDgRow('log-dg-list')">+ Add DGServer_Sn</button>
+          </div>
+          <div class="btn-row">
+            <span class="msg" id="paths-msg-2"></span>
+            <button class="btn-primary" onclick="savePaths()">SAVE</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = '/MAXGAUGE/utils/labs/api';
+
+  // 팝업 안에서 드래그 시작 → 바깥에서 mouseup 시 닫히지 않도록 mousedown 시작 위치 기준 판정.
+  function _ovMd(e){ e.currentTarget._md = (e.target === e.currentTarget); }
+  function _ovClick(e, fn){ if(e.currentTarget._md && e.target === e.currentTarget) fn(); }
+
+  async function doLogin(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('inp-id').value.trim();
+    const pw = document.getElementById('inp-pw').value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('btn-login');
+
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+
+    try {
+      const res = await fetch(API_BASE + '/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id, password: pw}),
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        errEl.textContent = translateErr(data.error);
+        document.getElementById('inp-pw').value = '';
+        document.getElementById('inp-pw').focus();
+        return;
+      }
+      applyRole(data.role, id);
+      document.getElementById('screen-login').classList.remove('active');
+      document.getElementById('screen-main').classList.add('active');
+    } catch (err) {
+      errEl.textContent = '로그인 요청 실패: ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '로그인';
+    }
+  }
+
+  function translateErr(code) {
+    if (!code) return '로그인에 실패했습니다.';
+    if (code === 'invalid credentials') return '아이디 또는 비밀번호가 올바르지 않습니다.';
+    if (code === 'account is locked') return '잠긴 계정입니다.';
+    if (code.indexOf('repository not configured') === 0)
+      return 'Repository DB가 설정되지 않았습니다. maxgauge 계정으로 로그인하여 설정을 완료하세요.';
+    if (code.indexOf('decrypt failed') === 0) return '비밀번호 검증 중 오류가 발생했습니다.';
+    if (code.indexOf('db error') === 0) return 'DB 조회 오류: ' + code.substring(10);
+    return code;
+  }
+
+  function applyRole(role, id) {
+    const inspector = document.getElementById('card-inspector');
+    const grid = document.getElementById('card-grid');
+    const badge = document.getElementById('user-badge');
+
+    if (role === 'engineer') {
+      inspector.style.display = 'block';
+      grid.className = 'cards two-col anim-2';
+      badge.innerHTML = '<strong>' + escapeHtml(id) + '</strong> · Engineer';
+    } else {
+      inspector.style.display = 'none';
+      grid.className = 'cards one-col anim-2';
+      badge.innerHTML = '<strong>' + escapeHtml(id) + '</strong> · User';
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  async function doLogout() {
+    try {
+      await fetch(API_BASE + '/logout', {method: 'POST', credentials: 'same-origin'});
+    } catch (_) {}
+    closeInspector();
+    closeConfig();
+    document.getElementById('screen-main').classList.remove('active');
+    document.getElementById('screen-login').classList.add('active');
+    document.getElementById('inp-id').value = '';
+    document.getElementById('inp-pw').value = '';
+    document.getElementById('login-error').textContent = '';
+  }
+
+  function openInspector() {
+    const frame = document.getElementById('inspector-frame');
+    frame.src = '/MAXGAUGE/utils/';
+    document.getElementById('screen-inspector').classList.add('active');
+    document.body.classList.add('inspector-open');
+  }
+
+  function closeInspector() {
+    const scr = document.getElementById('screen-inspector');
+    if (!scr.classList.contains('active')) return;
+    scr.classList.remove('active');
+    document.getElementById('inspector-frame').src = 'about:blank';
+    document.body.classList.remove('tablespace-open');
+    document.body.classList.remove('inspector-open');
+  }
+
+  function openTablespace() {
+    const frame = document.getElementById('inspector-frame');
+    frame.src = '/MAXGAUGE/labs/maxspace/';
+    document.getElementById('screen-inspector').classList.add('active');
+    document.body.classList.add('tablespace-open');
+  }
+
+  // ───────── Configuration 모달 ─────────
+  const INSPECTOR_API = '/MAXGAUGE/utils/api';
+
+  async function openConfig() {
+    document.getElementById('config-modal').classList.add('active');
+    clearMsgs();
+
+    try {
+      const [cfgRes, inspRes] = await Promise.all([
+        fetch(API_BASE + '/config', {credentials: 'same-origin'}),
+        fetch(INSPECTOR_API + '/insp-config', {credentials: 'same-origin'}),
+      ]);
+      if (cfgRes.status === 401 || inspRes.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (cfgRes.ok) populateConfig(await cfgRes.json());
+      if (inspRes.ok) populateInspConfig(await inspRes.json());
+    } catch (e) {
+      setMsg('repo-msg', '불러오기 실패: ' + e.message, 'err');
+    }
+  }
+
+  function closeConfig() {
+    document.getElementById('config-modal').classList.remove('active');
+  }
+
+  function handleSessionExpired() {
+    closeConfig();
+    closeInspector();
+    document.getElementById('screen-main').classList.remove('active');
+    document.getElementById('screen-login').classList.add('active');
+    const err = document.getElementById('login-error');
+    err.textContent = '세션이 만료되었습니다. 다시 로그인해주세요.';
+    document.getElementById('inp-id').focus();
+  }
+
+  function clearMsgs() {
+    ['repo-msg','paths-msg','paths-msg-2','ih-msg','drop-msg'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = ''; el.classList.remove('err','info'); }
+    });
+  }
+
+  function setMsg(id, text, kind) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('err','info');
+    if (kind) el.classList.add(kind);
+  }
+
+  function populateConfig(cfg) {
+    const r = cfg.repository || {};
+    document.getElementById('cfg-db-type').value = r.db_type || 'PostgreSQL';
+    document.getElementById('cfg-sid').value = r.sid || '';
+    document.getElementById('cfg-ip').value = r.ip || '';
+    document.getElementById('cfg-port').value = r.port || '';
+    document.getElementById('cfg-user').value = r.user || '';
+    document.getElementById('cfg-password').value = r.password || '';
+    document.getElementById('cfg-pg-home').value = r.pg_home || '';
+    document.getElementById('cfg-pg-data-dir').value = r.pg_data_dir || '';
+    toggleDbTypeFields(r.db_type || 'PostgreSQL');
+
+    const s = cfg.services || {};
+    document.getElementById('cfg-platformjs').value = s.platformjs || '';
+    document.getElementById('cfg-dgserver-m').value = s.dgserver_m || '';
+    renderDgList('svc-dg-list', s.dgserver_s);
+
+    const l = cfg.log_paths || {};
+    document.getElementById('cfg-log-platformjs').value = l.platformjs || '';
+    document.getElementById('cfg-log-dgserver-m').value = l.dgserver_m || '';
+    renderDgList('log-dg-list', l.dgserver_s);
+  }
+
+  function populateInspConfig(data) {
+    const cfg = data.config || data || {};
+    const enabled = !!cfg.enabled;
+    document.getElementById('ih-enabled').checked = enabled;
+    document.getElementById('ih-enabled-label').textContent = enabled ? 'ON' : 'OFF';
+    document.getElementById('ih-enabled-label').style.color = enabled ? '#6c54e8' : '#94a3b8';
+    document.getElementById('ih-retention').value = cfg.retention_days != null ? cfg.retention_days : 30;
+    document.getElementById('ih-log-retention').value = cfg.log_retention_days != null ? cfg.log_retention_days : 10;
+  }
+
+  function toggleDbTypeFields(type) {
+    const isPg = (type === 'PostgreSQL');
+    document.getElementById('cfg-pg-home-row').style.display = isPg ? '' : 'none';
+    document.getElementById('cfg-pg-data-row').style.display = isPg ? '' : 'none';
+  }
+
+  document.addEventListener('change', e => {
+    if (e.target && e.target.id === 'cfg-db-type') toggleDbTypeFields(e.target.value);
+    if (e.target && e.target.id === 'ih-enabled') {
+      const on = e.target.checked;
+      const lbl = document.getElementById('ih-enabled-label');
+      lbl.textContent = on ? 'ON' : 'OFF';
+      lbl.style.color = on ? '#6c54e8' : '#94a3b8';
+    }
+  });
+
+  // ── DGServer_Sn dynamic rows (Service / Log 짝지어 관리) ──
+  const SVC_LIST = 'svc-dg-list';
+  const LOG_LIST = 'log-dg-list';
+
+  function renderDgList(listId, values) {
+    const list = document.getElementById(listId);
+    list.innerHTML = '';
+    const arr = Array.isArray(values) ? values.slice() : [];
+    if (arr.length === 0) arr.push('');
+    arr.forEach(v => list.appendChild(buildDgRow(v, listId)));
+  }
+
+  function buildDgRow(value, listId) {
+    const row = document.createElement('div');
+    row.className = 'dgserver-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value || '';
+    if (listId === SVC_LIST) {
+      input.addEventListener('input', () => syncLogFromSvc(row));
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-remove';
+    btn.textContent = '−';
+    btn.addEventListener('click', () => removeDgRow(row, listId));
+
+    row.appendChild(input);
+    row.appendChild(btn);
+    return row;
+  }
+
+  function rowIndex(row) {
+    const list = row.parentElement;
+    return Array.from(list.children).indexOf(row);
+  }
+
+  // 마지막 비어있지 않은 input 값을 반환
+  function lastNonEmpty(listId) {
+    const inputs = Array.from(document.querySelectorAll('#' + listId + ' input'));
+    for (let i = inputs.length - 1; i >= 0; i--) {
+      const v = inputs[i].value.trim();
+      if (v) return v;
+    }
+    return '';
+  }
+
+  // path 문자열에서 "마지막 연속 숫자"를 +1
+  // 예) "/EXEM/DGSERVER_S5" → "/EXEM/DGSERVER_S6"
+  //     "/home/insp/PG/2604/DGServer_S1" → "/home/insp/PG/2604/DGServer_S2"
+  //     "/home/insp/PG/2604/DGServer_S1/log" → "/home/insp/PG/2604/DGServer_S2/log"
+  function incrementLastNumber(s) {
+    // "/log" 같은 trailing 경로 부분은 보존
+    const tailMatch = s.match(/(.*?)(\d+)([^\d]*)$/);
+    if (!tailMatch) return s;
+    const [, head, num, tail] = tailMatch;
+    return head + (parseInt(num, 10) + 1) + tail;
+  }
+
+  // Service 행 → 같은 index 의 Log 행 값을 "<svcPath>/log" 로 갱신
+  function syncLogFromSvc(svcRow) {
+    const idx = rowIndex(svcRow);
+    if (idx < 0) return;
+    const svcVal = svcRow.querySelector('input').value.trim();
+    const logList = document.getElementById(LOG_LIST);
+    // Log 행 개수를 Service 에 맞춤
+    while (logList.children.length < idx + 1) {
+      logList.appendChild(buildDgRow('', LOG_LIST));
+    }
+    const logInput = logList.children[idx].querySelector('input');
+    logInput.value = svcVal ? svcVal.replace(/\/+$/, '') + '/log' : '';
+  }
+
+  // Add 버튼: 마지막 값의 숫자를 +1 한 새 행을 생성.
+  // Service 쪽에서 추가하면 Log 쪽도 자동으로 "/log" 짝을 추가.
+  function addDgRow(listId) {
+    const last = lastNonEmpty(listId);
+    const newSvcVal = last ? incrementLastNumber(last) : '';
+
+    if (listId === SVC_LIST) {
+      const svcList = document.getElementById(SVC_LIST);
+      const logList = document.getElementById(LOG_LIST);
+      svcList.appendChild(buildDgRow(newSvcVal, SVC_LIST));
+      const logVal = newSvcVal ? newSvcVal + '/log' : '';
+      logList.appendChild(buildDgRow(logVal, LOG_LIST));
+    } else {
+      // Log 단독 추가 — 보통은 Service 에서 트리거되므로 드묾
+      document.getElementById(listId).appendChild(buildDgRow(newSvcVal, listId));
+    }
+  }
+
+  // Remove: Service 행 삭제 시 같은 index 의 Log 행도 함께 삭제
+  function removeDgRow(row, listId) {
+    const list = row.parentElement;
+    if (list.children.length <= 1) return;
+    const idx = rowIndex(row);
+    row.remove();
+    if (listId === SVC_LIST) {
+      const logList = document.getElementById(LOG_LIST);
+      if (logList.children[idx] && logList.children.length > 1) {
+        logList.children[idx].remove();
+      }
+    }
+  }
+
+  function collectDgList(listId) {
+    return Array.from(document.querySelectorAll('#' + listId + ' input'))
+      .map(i => i.value.trim()).filter(v => v);
+  }
+
+  // PlatformJS / DGServer_M 도 DGServer_Sn 과 동일하게 service path 입력 시
+  // 대응 log path 를 "<svc>/log" 로 자동 채움. (DGServer_Sn 의 syncLogFromSvc 와 같은 동작)
+  function _bindSvcLogSync(svcId, logId) {
+    const svc = document.getElementById(svcId);
+    const log = document.getElementById(logId);
+    if (!svc || !log) return;
+    svc.addEventListener('input', () => {
+      const v = svc.value.trim().replace(/\/+$/, '');
+      log.value = v ? v + '/log' : '';
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    _bindSvcLogSync('cfg-platformjs', 'cfg-log-platformjs');
+    _bindSvcLogSync('cfg-dgserver-m', 'cfg-log-dgserver-m');
+  });
+
+  // ── Collapsible ──
+  function toggleCollapse(btn) {
+    btn.classList.toggle('open');
+    btn.nextElementSibling.classList.toggle('open');
+  }
+
+  // ── Repository save ──
+  async function saveRepo() {
+    const btn = document.getElementById('repo-save');
+    setMsg('repo-msg', '저장 중...', 'info');
+    btn.disabled = true;
+
+    const payload = {
+      _section: 'repo',
+      db_type: document.getElementById('cfg-db-type').value,
+      sid: document.getElementById('cfg-sid').value.trim(),
+      ip: document.getElementById('cfg-ip').value.trim(),
+      port: document.getElementById('cfg-port').value.trim(),
+      user: document.getElementById('cfg-user').value.trim(),
+      password: document.getElementById('cfg-password').value,
+      pg_home: document.getElementById('cfg-pg-home').value.trim(),
+      pg_data_dir: document.getElementById('cfg-pg-data-dir').value.trim(),
+    };
+    try {
+      const res = await fetch(API_BASE + '/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      const data = await res.json();
+      if (data.ok) {
+        setMsg('repo-msg', '저장되었습니다.', '');
+        _showProcModal(data.db_type || 'Oracle');
+      } else setMsg('repo-msg', data.error || '저장 실패', 'err');
+    } catch (e) {
+      setMsg('repo-msg', '요청 실패: ' + e.message, 'err');
+    } finally { btn.disabled = false; }
+  }
+
+  // ── Paths save (Service + Log) ──
+  async function savePaths() {
+    setMsg('paths-msg',   '저장 중...', 'info');
+    setMsg('paths-msg-2', '저장 중...', 'info');
+
+    const payload = {
+      _section: 'paths',
+      platformjs: document.getElementById('cfg-platformjs').value.trim(),
+      dgserver_m: document.getElementById('cfg-dgserver-m').value.trim(),
+      dgserver_s: collectDgList('svc-dg-list'),
+      log_platformjs: document.getElementById('cfg-log-platformjs').value.trim(),
+      log_dgserver_m: document.getElementById('cfg-log-dgserver-m').value.trim(),
+      log_dgserver_s: collectDgList('log-dg-list'),
+    };
+    try {
+      const res = await fetch(API_BASE + '/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      const data = await res.json();
+      const text = data.ok ? '저장되었습니다.' : (data.error || '저장 실패');
+      const kind = data.ok ? '' : 'err';
+      setMsg('paths-msg', text, kind);
+      setMsg('paths-msg-2', text, kind);
+    } catch (e) {
+      const text = '요청 실패: ' + e.message;
+      setMsg('paths-msg', text, 'err');
+      setMsg('paths-msg-2', text, 'err');
+    }
+  }
+
+  // ── Connection Test (팝업) ──
+  function openConnTest() {
+    document.getElementById('ct-overlay').classList.add('active');
+    document.getElementById('ct-body').innerHTML = '<div class="ct-loading">Testing...</div>';
+  }
+  function closeConnTest() {
+    document.getElementById('ct-overlay').classList.remove('active');
+  }
+
+  async function testConnection() {
+    const btn = document.getElementById('repo-test');
+    btn.disabled = true;
+    setMsg('repo-msg', '', '');
+    openConnTest();
+
+    // 입력된 값으로 먼저 SAVE (테스트는 저장된 설정 기반)
+    const saved = await saveRepoSilent();
+    if (!saved) {
+      document.getElementById('ct-body').innerHTML =
+        '<div class="ct-loading" style="color:#ef4444;">Repository 저장 실패 — 로그인 상태를 확인하세요.</div>';
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      const res = await fetch(INSPECTOR_API + '/connection-test', {credentials: 'same-origin'});
+      if (res.status === 401) {
+        closeConnTest();
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      renderConnTestTable(data.results || []);
+    } catch (e) {
+      document.getElementById('ct-body').innerHTML =
+        '<div class="ct-loading" style="color:#ef4444;">Error: ' + escapeHtml(e.message) + '</div>';
+    } finally { btn.disabled = false; }
+  }
+
+  function renderConnTestTable(results) {
+    if (!results.length) {
+      document.getElementById('ct-body').innerHTML =
+        '<div class="ct-loading">결과가 없습니다.</div>';
+      return;
+    }
+    const rows = results.map(r => {
+      const cls = r.status === 'OK' ? 'ok' : r.status === 'FAIL' ? 'fail' : 'skip';
+      return '<tr>'
+        + '<td class="comp">' + escapeHtml(r.component) + '</td>'
+        + '<td><span class="ct-pill ' + cls + '">' + escapeHtml(r.status) + '</span></td>'
+        + '<td class="detail">' + escapeHtml(r.detail || '') + '</td>'
+        + '</tr>';
+    }).join('');
+    document.getElementById('ct-body').innerHTML =
+      '<table class="ct-table">'
+      + '<thead><tr><th>Component</th><th>Status</th><th>Detail</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>';
+  }
+
+  async function saveRepoSilent() {
+    const payload = {
+      _section: 'repo',
+      db_type: document.getElementById('cfg-db-type').value,
+      sid: document.getElementById('cfg-sid').value.trim(),
+      ip: document.getElementById('cfg-ip').value.trim(),
+      port: document.getElementById('cfg-port').value.trim(),
+      user: document.getElementById('cfg-user').value.trim(),
+      password: document.getElementById('cfg-password').value,
+      pg_home: document.getElementById('cfg-pg-home').value.trim(),
+      pg_data_dir: document.getElementById('cfg-pg-data-dir').value.trim(),
+    };
+    try {
+      const res = await fetch(API_BASE + '/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 401) { handleSessionExpired(); return false; }
+      return res.ok;
+    } catch (_) { return false; }
+  }
+
+  // ── Collection Settings (insp_config) save ──
+  async function saveInspConfig() {
+    setMsg('ih-msg', '저장 중...', 'info');
+    const payload = {
+      enabled: document.getElementById('ih-enabled').checked,
+      retention_days: parseInt(document.getElementById('ih-retention').value, 10) || 30,
+      log_retention_days: parseInt(document.getElementById('ih-log-retention').value, 10) || 10,
+    };
+    try {
+      const res = await fetch(INSPECTOR_API + '/insp-config-save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      const data = await res.json();
+      if (data.ok) setMsg('ih-msg', '저장되었습니다.', '');
+      else setMsg('ih-msg', data.error || '저장 실패', 'err');
+    } catch (e) {
+      setMsg('ih-msg', '요청 실패: ' + e.message, 'err');
+    }
+  }
+
+  // ── Drop INSP tables ──
+  async function dropInspTables() {
+    if (!confirm('Inspector History 테이블(INSP_*)을 전부 삭제합니다.\n계속 진행하시겠습니까?')) return;
+    setMsg('drop-msg', '삭제 중...', 'info');
+    try {
+      const res = await fetch(INSPECTOR_API + '/insp-drop-tables', {
+        method: 'POST', credentials: 'same-origin',
+      });
+      if (res.status === 401) { handleSessionExpired(); return; }
+      const data = await res.json();
+      if (data.ok) setMsg('drop-msg', data.message || '삭제되었습니다.', '');
+      else setMsg('drop-msg', data.error || data.message || '삭제 실패', 'err');
+    } catch (e) {
+      setMsg('drop-msg', '요청 실패: ' + e.message, 'err');
+    }
+  }
+
+  // ── Repository Save 후 팝업 플로우 ──
+  function _showProcModal(dbType) {
+    var isOra = (dbType === 'Oracle');
+    var title = isOra ? 'Procedure 생성' : 'Function 생성';
+    var objName = isOra ? '프로시저' : '함수';
+    var desc = isOra
+      ? '<b>INSP_PARTITION_CREATE_TARGET</b> — 파티션 수동 생성 (D-1~D+3)<br>'
+        + '<b>INSP_PARTITION_DROP_TARGET</b> — 만료 파티션 수동 삭제<br><br>'
+        + '위 프로시저들은 Partition Create/Drop Check 기능에 사용됩니다.'
+      : '<b>insp_session_check</b> — Session Check 조회<br>'
+        + '<b>insp_alarm_history_check</b> — Alert Check 조회<br>'
+        + '<b>insp_query_check</b> — Query Check 조회<br><br>'
+        + '위 함수들은 각 Check 페이지 조회 기능에 사용됩니다.';
+    var html = '<div id="proc-modal" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;">'
+      + '<div onclick="document.getElementById(\'proc-modal\').remove()" style="position:absolute;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);"></div>'
+      + '<div style="position:relative;width:min(520px,92vw);background:#fff;border-radius:16px;box-shadow:0 30px 70px rgba(15,23,42,.25);border:1px solid rgba(226,232,240,.9);overflow:hidden;">'
+        + '<div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:32px;height:32px;border-radius:9px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>'
+          + '<span style="font-size:.92rem;font-weight:700;color:#0F172A;">' + title + '</span>'
+        + '</div>'
+        + '<div style="padding:18px 20px;">'
+          + '<p style="font-size:.88rem;color:#334155;margin:0 0 14px;">Repository DB에 ' + objName + '를 생성하시겠습니까?</p>'
+          + '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;font-size:.82rem;color:#475569;line-height:1.7;">' + desc + '</div>'
+          + '<div id="proc-modal-result" style="margin-top:12px;font-size:.82rem;"></div>'
+        + '</div>'
+        + '<div style="padding:14px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">'
+          + '<button onclick="document.getElementById(\'proc-modal\').remove();_showTableModal(\'' + dbType + '\')" style="padding:8px 20px;border-radius:10px;border:1px solid #CBD5E1;color:#64748B;background:#fff;font-size:.84rem;cursor:pointer;">아니오</button>'
+          + '<button id="proc-modal-yes" onclick="_doProcCreate(\'' + dbType + '\')" style="padding:8px 20px;border-radius:10px;border:none;background:#6366F1;color:#fff;font-size:.84rem;font-weight:600;cursor:pointer;">예, 생성</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+    var w = document.createElement('div'); w.innerHTML = html;
+    while (w.firstChild) document.body.appendChild(w.firstChild);
+  }
+
+  var _procDbType = '';
+  function _doProcCreate(dbType) {
+    _procDbType = dbType || _procDbType;
+    var btn = document.getElementById('proc-modal-yes');
+    var res = document.getElementById('proc-modal-result');
+    btn.disabled = true; btn.textContent = 'Creating...'; btn.style.opacity = '.5';
+    fetch(INSPECTOR_API + '/create-procedure', {credentials: 'same-origin'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        res.innerHTML = '<span style="color:#22c55e;font-weight:600;">✓ ' + d.message + '</span>';
+        btn.style.display = 'none';
+        var noBtn = btn.parentElement.querySelector('[onclick*=proc-modal]');
+        if (noBtn) {
+          noBtn.textContent = '확인'; noBtn.style.background = '#6366F1'; noBtn.style.color = '#fff';
+          noBtn.style.borderColor = '#6366F1'; noBtn.style.fontWeight = '600';
+          noBtn.onclick = function() { document.getElementById('proc-modal').remove(); _showTableModal(_procDbType); };
+        }
+      } else {
+        btn.disabled = false; btn.textContent = '예, 생성'; btn.style.opacity = '1';
+        res.innerHTML = '<span style="color:#ef4444;">✕ ' + d.error + '</span>';
+      }
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = '예, 생성'; btn.style.opacity = '1';
+      res.innerHTML = '<span style="color:#ef4444;">요청 실패</span>';
+    });
+  }
+
+  function _showTableModal(dbType) {
+    var isOra = (dbType === 'Oracle');
+    var desc = ''
+      + '<b>' + (isOra ? 'INSP_OS_HISTORY' : 'insp_os_history') + '</b> — OS CPU / Memory 사용률 이력<br>'
+      + '<b>' + (isOra ? 'INSP_TBS_HISTORY' : 'insp_tbs_history') + '</b> — Tablespace 사용률 이력<br>'
+      + '<b>' + (isOra ? 'INSP_SERVICE_HISTORY' : 'insp_service_history') + '</b> — DGServer / PlatformJS 서비스 상태 이력<br>'
+      + '<b>' + (isOra ? 'INSP_HEAP_HISTORY' : 'insp_heap_history') + '</b> — JVM Heap 사용량 이력<br>'
+      + '<b>' + (isOra ? 'INSP_QCNT_HISTORY' : 'insp_qcnt_history') + '</b> — 쿼리 수집 건수 이력<br>'
+      + '<b>' + (isOra ? 'INSP_SUMMARY_HISTORY' : 'insp_summary_history') + '</b> — 10분 / 1시간 Summary 수집 이력<br>'
+      + '<b>' + (isOra ? 'INSP_MONTHLY_SUMMARY' : 'insp_monthly_summary') + '</b> — 월별 CPU / Memory / Disk 평균 (Report 자동 입력용)<br><br>'
+      + '위 테이블들은 <b>Inspector History</b> 기능 (OS, Tablespace, Process 등 히스토리 차트)에 사용됩니다.';
+    var html = '<div id="tbl-modal" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;">'
+      + '<div onclick="document.getElementById(\'tbl-modal\').remove()" style="position:absolute;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);"></div>'
+      + '<div style="position:relative;width:min(560px,92vw);background:#fff;border-radius:16px;box-shadow:0 30px 70px rgba(15,23,42,.25);border:1px solid rgba(226,232,240,.9);overflow:hidden;">'
+        + '<div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:32px;height:32px;border-radius:9px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>'
+          + '<span style="font-size:.92rem;font-weight:700;color:#0F172A;">Inspector History Table 생성</span>'
+        + '</div>'
+        + '<div style="padding:18px 20px;">'
+          + '<p style="font-size:.88rem;color:#334155;margin:0 0 14px;">Inspector History 테이블을 생성하시겠습니까?</p>'
+          + '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;font-size:.82rem;color:#475569;line-height:1.7;">' + desc + '</div>'
+          + '<div id="tbl-modal-result" style="margin-top:12px;font-size:.82rem;"></div>'
+        + '</div>'
+        + '<div style="padding:14px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">'
+          + '<button onclick="document.getElementById(\'tbl-modal\').remove();_showCollModal(\'' + dbType + '\')" style="padding:8px 20px;border-radius:10px;border:1px solid #CBD5E1;color:#64748B;background:#fff;font-size:.84rem;cursor:pointer;">아니오</button>'
+          + '<button id="tbl-modal-yes" onclick="_doTableCreate(\'' + dbType + '\')" style="padding:8px 20px;border-radius:10px;border:none;background:#6366F1;color:#fff;font-size:.84rem;font-weight:600;cursor:pointer;">예, 생성</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+    var w = document.createElement('div'); w.innerHTML = html;
+    while (w.firstChild) document.body.appendChild(w.firstChild);
+  }
+
+  var _tblDbType = '';
+  function _doTableCreate(dbType) {
+    _tblDbType = dbType || _tblDbType;
+    var btn = document.getElementById('tbl-modal-yes');
+    var res = document.getElementById('tbl-modal-result');
+    btn.disabled = true; btn.textContent = 'Creating...'; btn.style.opacity = '.5';
+    fetch(INSPECTOR_API + '/insp-init-tables', {method: 'POST', credentials: 'same-origin'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        res.innerHTML = '<span style="color:#22c55e;font-weight:600;">✓ ' + (d.message || '테이블 생성 완료') + '</span>';
+        btn.style.display = 'none';
+        var noBtn = btn.parentElement.querySelector('[onclick*=tbl-modal]');
+        if (noBtn) {
+          noBtn.textContent = '확인'; noBtn.style.background = '#6366F1'; noBtn.style.color = '#fff';
+          noBtn.style.borderColor = '#6366F1'; noBtn.style.fontWeight = '600';
+          noBtn.onclick = function() { document.getElementById('tbl-modal').remove(); _showCollModal(_tblDbType); };
+        }
+      } else {
+        btn.disabled = false; btn.textContent = '예, 생성'; btn.style.opacity = '1';
+        res.innerHTML = '<span style="color:#ef4444;">✕ ' + (d.error || '생성 실패') + '</span>';
+      }
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = '예, 생성'; btn.style.opacity = '1';
+      res.innerHTML = '<span style="color:#ef4444;">요청 실패</span>';
+    });
+  }
+
+  function _showCollModal(dbType) {
+    var isOra = (dbType === 'Oracle');
+    var html = '<div id="coll-modal" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;">'
+      + '<div onclick="document.getElementById(\'coll-modal\').remove()" style="position:absolute;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);"></div>'
+      + '<div style="position:relative;width:min(540px,92vw);background:#fff;border-radius:16px;box-shadow:0 30px 70px rgba(15,23,42,.25);border:1px solid rgba(226,232,240,.9);overflow:hidden;">'
+        + '<div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:32px;height:32px;border-radius:9px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>'
+          + '<span style="font-size:.92rem;font-weight:700;color:#0F172A;">Inspector History 수집 설정</span>'
+        + '</div>'
+        + '<div style="padding:18px 20px;">'
+          + '<p style="font-size:.88rem;color:#334155;margin:0 0 14px;">Inspector History 데이터 수집을 시작하시겠습니까?</p>'
+          + '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;font-size:.82rem;color:#475569;line-height:1.7;">'
+          + '수집을 활성화하면 아래 주기로 데이터가 자동 수집됩니다.<br><br>'
+          + '<b>CPU / Memory</b> — 1분마다<br>'
+          + '<b>Qcnt (Connection)</b> — 1분마다<br>'
+          + '<b>Heap (JVM)</b> — 1분마다<br>'
+          + '<b>Service Status</b> — 1시간마다<br>'
+          + '<b>' + (isOra ? 'Tablespace' : 'Disk') + '</b> — 매일 23:50<br>'
+          + '<b>Summary (10Min / 1Hour)</b> — 10분 / 1시간마다</div>'
+          + '<div id="coll-modal-result" style="margin-top:12px;font-size:.82rem;"></div>'
+        + '</div>'
+        + '<div style="padding:14px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">'
+          + '<button onclick="document.getElementById(\'coll-modal\').remove()" style="padding:8px 20px;border-radius:10px;border:1px solid #CBD5E1;color:#64748B;background:#fff;font-size:.84rem;cursor:pointer;">나중에</button>'
+          + '<button id="coll-modal-yes" onclick="_doCollStart()" style="padding:8px 20px;border-radius:10px;border:none;background:#6366F1;color:#fff;font-size:.84rem;font-weight:600;cursor:pointer;">수집 시작</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+    var w = document.createElement('div'); w.innerHTML = html;
+    while (w.firstChild) document.body.appendChild(w.firstChild);
+  }
+
+  function _doCollStart() {
+    var btn = document.getElementById('coll-modal-yes');
+    var res = document.getElementById('coll-modal-result');
+    btn.disabled = true; btn.textContent = 'Setting...'; btn.style.opacity = '.5';
+    fetch(INSPECTOR_API + '/insp-config-save', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin', body: JSON.stringify({enabled: true})})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        res.innerHTML = '<span style="color:#22c55e;font-weight:600;">✓ 수집이 시작되었습니다.</span>';
+        btn.style.display = 'none';
+        var noBtn = btn.parentElement.querySelector('[onclick*=coll-modal]');
+        if (noBtn) {
+          noBtn.textContent = '확인'; noBtn.style.background = '#6366F1'; noBtn.style.color = '#fff';
+          noBtn.style.borderColor = '#6366F1'; noBtn.style.fontWeight = '600';
+        }
+        var chk = document.getElementById('ih-enabled');
+        if (chk) {
+          chk.checked = true;
+          var lbl = document.getElementById('ih-enabled-label');
+          if (lbl) { lbl.textContent = 'ON'; lbl.style.color = '#6c54e8'; }
+        }
+      } else {
+        btn.disabled = false; btn.textContent = '수집 시작'; btn.style.opacity = '1';
+        res.innerHTML = '<span style="color:#ef4444;">✕ ' + (d.error || '실패') + '</span>';
+      }
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = '수집 시작'; btn.style.opacity = '1';
+      res.innerHTML = '<span style="color:#ef4444;">요청 실패</span>';
+    });
+  }
+
+  document.getElementById('login-form').addEventListener('submit', doLogin);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      // Connection Test 팝업이 열려있으면 그것 먼저 닫음
+      const ct = document.getElementById('ct-overlay');
+      if (ct && ct.classList.contains('active')) { closeConnTest(); return; }
+      const modal = document.getElementById('config-modal');
+      if (modal.classList.contains('active')) closeConfig();
+    }
+  });
+
+  // 페이지 로드 시 기존 세션이 있으면 자동으로 카드 화면으로
+  (async function resumeSession() {
+    try {
+      const res = await fetch(API_BASE + '/whoami', {credentials: 'same-origin'});
+      const data = await res.json();
+      if (data && data.ok && data.role) {
+        applyRole(data.role, data.id || '');
+        document.getElementById('screen-login').classList.remove('active');
+        document.getElementById('screen-main').classList.add('active');
+      }
+    } catch (_) { /* ignore — stay on login */ }
+  })();
+</script>
+</body>
+</html>
