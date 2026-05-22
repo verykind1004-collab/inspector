@@ -5,12 +5,12 @@
 
 ## 0. 한눈에
 
-- 프로젝트: 기존 MaxGauge Inspector Labs를 Java로 재구현(rewrite)
+- 프로젝트: 기존 MaxGauge Inspector Labs를 재구현(rewrite). **풀스택 — 백엔드(Java) + 프론트(React SPA)를 모두 우리가 구축한다.**
 - **핵심 목표: 다양한 DB 성능분석 화면을 통일된 UI·화면구조·백엔드로 계속 추가할 수 있는 확장 플랫폼을 만든다.** 단순 1:1 포팅이 아니다. (규약은 I절)
-- 부차 목적: 보안 취약점 개선 + 기존 MaxGauge 제품과 개발언어(Java) 통일
+- 부차 목적: 보안 취약점 개선 + 기존 MaxGauge 제품과 스택 통일(백엔드 Java, 프론트는 MaxGauge VI 표준)
 - 기존 Python/HTTP/HTML 코드(`Labs/`)는 "참조 명세"이며 수정 대상이 아니다 (순수 `http.server` 기반 — README의 "FastAPI" 표기는 부정확)
-- 신규 Java 코드만 작성·수정한다
-- 개발은 반드시 이 서버에서 수행한다 (MaxGauge 연동 필수)
+- 신규 코드: 백엔드 `java/`(Spring Boot REST API) + 프론트(React SPA, 별도 레포). `Labs/`는 참조만.
+- 백엔드 개발은 반드시 이 서버에서 수행한다 (MaxGauge 연동 필수). 프론트는 API 모킹(MSW)으로 분리 개발 가능.
 
 ## A. 행동 원칙 (Karpathy 4원칙)
 
@@ -60,17 +60,21 @@
 
 - 언어/런타임: Java, JDK 8 (`/home/inspector/jdk8u422-b05`) [확정]
 - 프레임워크: Spring Boot 2.7.x (JDK 8 호환 최종 라인) [확정]
-- 빌드: Maven wrapper (`./mvnw`) — 서버에 maven 미설치, wrapper 자동 다운로드 [잠정, 변경 부담 적음]
-- DB 접근: MyBatis(진단 SQL, databaseId로 Oracle/PG 분기) + JdbcTemplate(동적 DDL/파티션) + HikariCP 풀. **JPA 미사용** [잠정확정 — 프론트 무관]
+- 빌드: Maven wrapper (`./mvnw`) — 서버에 maven 미설치, wrapper 자동 다운로드(only-script) [확정]
+- DB 접근: MyBatis(진단 SQL, databaseId로 Oracle/PG 분기) + JdbcTemplate(동적 DDL/파티션) + HikariCP 풀. **JPA 미사용** [잠정확정]
 - DB: Oracle / PostgreSQL (기존 `db_utils.py` 동작을 사양으로)
-- 프론트: **MaxGauge 본체와 통일 — 정보 수신 대기 중** (SSR/SPA 결정 보류). 표현 계층이므로 백엔드 코어와 분리 설계
+- 프론트: **React SPA [확정]** (MaxGauge VI 표준과 통일). 별도 레포(폴리레포). 표현 계층이므로 백엔드(REST API)와 분리.
+  - 스택: Vite · TypeScript · TanStack Router/Query · Zustand · Tailwind CSS · Radix UI(헤드리스) · **FSD 아키텍처** · Storybook · Vitest/Playwright · MSW · pnpm
+  - 디자인시스템: **EXEM UI Design System**(`@exem-fe/*` npm — stylesheet/design-token/react/icon/tailwindcss-plugin) 소비. 토큰 SSOT = `global.css`
+- 백엔드 ↔ 프론트 접점: REST API(표준 JSON 응답 스키마) · 쿠키 세션 인증 · CORS · 정적 산출물 nginx 서빙
 - 게이트웨이: 기존 nginx 유지 (auth_request 연동) [확정]
 
 ## D. 환경
 
 - 개발 위치(정본): `/home/inspector/release/inspector` (git 작업트리)
 - 빌드/패키징 작업본: `/home/inspector/release/github` (git 아님 — 건드리지 말 것)
-- 원격: `github.com/verykind1004-collab/inspector` (public)
+- 원격: `github.com/verykind1004-collab/inspector` (public) — 백엔드
+- 프론트 레포: 별도(폴리레포). 위치/원격 **미정(TBD)**. EXEM UI Design System은 프론트팀이 운영하는 별도 GitLab 모노레포에서 npm으로 소비
 - 연동 대상: 동일 서버의 MaxGauge (`/home/maxgauge*`)
 - JDK 설정 예:
   ```
@@ -99,6 +103,7 @@
 - 테스트: `java/` 에서 `./mvnw -B -ntp test`
 - 게이트: 컴파일 + 테스트 통과를 "변경 완료"의 기준으로 한다.
 - 빌드 환경: `JAVA_HOME=/home/inspector/jdk8u422-b05`. 서버에 maven 미설치 — wrapper(`./mvnw`)가 자동 다운로드(only-script). 최초 부트스트랩에 `/tmp/apache-maven-3.9.9` 사용.
+- 프론트(별도 레포): `pnpm install` → `pnpm dev`(Vite) / `pnpm build` / `pnpm test`(Vitest) / `pnpm storybook`. 게이트 = lint+typecheck+test 통과.
 
 ## H. 금지 사항
 
@@ -113,11 +118,19 @@
 ## I. 분석화면 추가 규약 (확장 플랫폼의 핵심)
 
 새 DB 성능분석 화면을 추가할 때 아래를 반드시 따른다. 일관성은 권장이 아니라 규약이다.
+기존 Python의 실패 지점 = 공통화 미강제(html_helpers를 안 거쳐 화면마다 제각각). 이를 **구조로 강제**한다.
 
-- 모든 화면은 **공통 레이아웃**(사이드바·탑바·도움말 셸)을 상속한다. 페이지 셸을 새로 만들지 않는다.
-- 한 화면 = `[Controller + Service + Mapper(+동적이면 JdbcTemplate) + 화면 fragment]` 한 세트. 이 구조를 벗어나지 않는다.
-- UI는 **공통 컴포넌트**(테이블 렌더러·차트·인스턴스 필터·배지·카드)를 조합한다. HTML/CSS를 화면마다 직접 조립하지 않는다 (기존 Python의 실패 지점 — html_helpers가 강제되지 않아 화면마다 제각각).
-- DB 접근은 **공통 추상화 계층**을 경유한다. 화면이 커넥션을 직접 열지 않는다.
-- 인증/보안은 Spring Security가 일괄 적용한다. 화면별 수동 인증 체크를 넣지 않는다.
-- Oracle/PG 분기는 공통 메커니즘(MyBatis databaseId 등)으로 처리한다. 화면 코드에 분기를 흩뿌리지 않는다.
-- 단순 SQL 점검 화면은 가능하면 메타데이터(SQL+컬럼정의) 기반 공통 템플릿으로 생성한다 (기존 `_db_page` 패턴 일반화).
+**한 화면 = 백엔드 1세트 + 프론트 1세트**
+- 백엔드: `[Controller + Service + Mapper(+동적이면 JdbcTemplate)] → 표준 JSON 응답`. 화면이 SQL/커넥션을 직접 다루지 않는다.
+- 프론트: `feature`(FSD) 하나가 **공통 컴포넌트를 조합**한다. 화면이 UI를 직접 조립하지 않는다.
+
+**UI 공통화 2층 (프론트, React SPA)**
+- 1층 = **EXEM UI Design System**(`@exem-fe/*`): 토큰·기본 컴포넌트. 범용, 그대로 소비.
+- 2층 = **Inspector 전용 공통 컴포넌트** = 프론트 레포 **FSD `shared`/`entities` 레이어**: DB 결과 테이블 렌더러(STATUS 배지·DELAY·정렬), 인스턴스 필터, 사이드바 메뉴(Oracle/PG 조건부), 도움말, FAB 도구바, 영한 제목.
+- 화면(feature)은 1·2층을 **조합만** 한다. 새 페이지 셸/디자인 토큰을 화면마다 만들지 않는다.
+
+**백엔드 공통화**
+- 응답은 **표준 JSON 스키마**를 따른다(컬럼 메타 + 행 + STATUS/DELAY 등 도메인 필드) → 2층 테이블 렌더러가 일관 소비.
+- DB 접근은 공통 추상화 계층(MyBatis databaseId)을 경유. Oracle/PG 분기를 화면 코드에 흩뿌리지 않는다.
+- 인증/보안은 Spring Security가 일괄 적용. 화면별 수동 인증 체크 금지.
+- 단순 SQL 점검 화면은 메타데이터(SQL+컬럼정의) 기반 공통 처리로 일반화한다 (기존 `_db_page` 패턴).
