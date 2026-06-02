@@ -21,18 +21,24 @@ import com.exem.inspector.config.ServicesBlock;
  * 프로세스 제어 — DGServer_M / DGServer_S* / PlatformJS start/stop/restart.
  *
  * <p>원본 pages/control_process.py 의 _start_dgserver / _stop_dgserver / _start_platformjs / _stop_platformjs
- * 와 동등. 본 단계는 핵심 액션만 구현하고 Observer(mxg_obsd) 시작/정지는 후속 보강(START_DG 시 observer 도
- * 같이 띄우는 원본 흐름은 보존하되, 실패해도 메인 액션은 성공 처리).
+ * 와 1:1 동등. Observer(mxg_obsd) 동반 시작/정지는 ObsdHelper 위임 (Session 2 보강).
+ * <ul>
+ *   <li>start: 메인 프로세스 시작 → 성공 시 obsd 동반 시작. obsd 실패해도 메인은 성공 처리.</li>
+ *   <li>stop: obsd 먼저 정지(auto-restart 차단) → 메인 정지.</li>
+ * </ul>
  */
 @Service
 public class ControlProcessService {
 
     private static final Logger log = LoggerFactory.getLogger(ControlProcessService.class);
+    private static final int PLATFORMJS_DEFAULT_PORT = 8888;
 
     private final ServiceConfig serviceConfig;
+    private final ObsdHelper obsdHelper;
 
-    public ControlProcessService(ServiceConfig serviceConfig) {
+    public ControlProcessService(ServiceConfig serviceConfig, ObsdHelper obsdHelper) {
         this.serviceConfig = serviceConfig;
+        this.obsdHelper = obsdHelper;
     }
 
     public ControlProcessResult start(String name) {
@@ -73,7 +79,6 @@ public class ControlProcessService {
         if (!Files.exists(binDir.resolve("DGServer.jar"))) {
             return new ControlProcessResult(false, "DGServer.jar not found in " + binDir);
         }
-        // 이미 가동 중이면 skip(원본은 _dg_info 로 ps 검사 — 우리는 PID 직접 검색).
         String existing = findDgPid(dgName);
         if (existing != null) {
             return new ControlProcessResult(false, dgName + " is already running. (PID: " + existing + ")");
@@ -92,25 +97,37 @@ public class ControlProcessService {
         if (pid == null) {
             return new ControlProcessResult(false, dgName + " start failed. Check logs.");
         }
-        return new ControlProcessResult(true, dgName + " started. (PID: " + pid + ")");
+
+        // ── Observer 동반 시작 (원본 _start_dgserver 1:1) ───────────────────
+        ObsdHelper.Result obsd = obsdHelper.startDgObsd(home, mxgrc);
+        return new ControlProcessResult(true,
+                dgName + " started. (PID: " + pid + ") / Observer: " + obsd.message);
     }
 
     private ControlProcessResult stopDgserver(Path home) {
         Map<String, String> mxgrc = MxgrcParser.parse(home);
         String dgName = mxgrc.getOrDefault("DG_NAME", "DGServer");
+        String label = dgName.isEmpty() ? "DGServer" : dgName;
+
+        // ── 1. Observer 먼저 정지 (auto-restart 차단) ─────────────────────
+        String obsdPid = obsdHelper.getDgObsdPid(dgName);
+        String obsdMsg = obsdPid == null
+                ? "Observer: not running"
+                : "Observer: " + obsdHelper.stopObsd(obsdPid).message;
+
+        // ── 2. DGServer 정지 ──────────────────────────────────────────────
         String pid = findDgPid(dgName);
         if (pid == null) {
-            return new ControlProcessResult(true, dgName + " is not running.");
+            return new ControlProcessResult(true, label + " is not running. / " + obsdMsg);
         }
         runShell("kill " + pid, null, null);
         sleep(5);
-        // 여전히 살아있으면 -9.
         String alive = findDgPid(dgName);
         if (alive != null) {
             runShell("kill -9 " + pid, null, null);
             sleep(2);
         }
-        return new ControlProcessResult(true, dgName + " stopped. (PID: " + pid + ")");
+        return new ControlProcessResult(true, label + " stopped. (PID: " + pid + ") / " + obsdMsg);
     }
 
     private String findDgPid(String dgName) {
@@ -142,10 +159,23 @@ public class ControlProcessService {
         if (pid == null) {
             return new ControlProcessResult(false, "PlatformJS start failed. Check logs.");
         }
-        return new ControlProcessResult(true, "PlatformJS started. (PID: " + pid + ")");
+
+        // ── Observer 동반 시작 ───────────────────────────────────────────
+        ObsdHelper.Result obsd = obsdHelper.startPjsObsd(home, String.valueOf(PLATFORMJS_DEFAULT_PORT));
+        return new ControlProcessResult(true,
+                "PlatformJS started. (PID: " + pid + ", Port: " + PLATFORMJS_DEFAULT_PORT
+                        + ") / Observer: " + obsd.message);
     }
 
     private ControlProcessResult stopPlatformJs(Path home) {
+        // ── 1. Observer 먼저 정지 ────────────────────────────────────────
+        String pjsPort = String.valueOf(PLATFORMJS_DEFAULT_PORT);
+        String obsdPid = obsdHelper.getPjsObsdPid(pjsPort);
+        String obsdMsg = obsdPid == null
+                ? "Observer: not running"
+                : "Observer: " + obsdHelper.stopObsd(obsdPid).message;
+
+        // ── 2. PlatformJS 정지 ───────────────────────────────────────────
         Path stopSh = home.resolve("platformjs.stop.sh");
         if (Files.exists(stopSh)) {
             runShell("bash platformjs.stop.sh", home, buildEnv(MxgrcParser.parse(home)));
@@ -161,7 +191,8 @@ public class ControlProcessService {
                 sleep(1);
             }
         }
-        return new ControlProcessResult(true, "PlatformJS stopped." + (pid != null ? " (PID: " + pid + ")" : ""));
+        return new ControlProcessResult(true,
+                "PlatformJS stopped." + (pid != null ? " (PID: " + pid + ")" : "") + " / " + obsdMsg);
     }
 
     private String findPjsPid() {
@@ -232,7 +263,6 @@ public class ControlProcessService {
         try {
             ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
             if (cwd != null) pb.directory(cwd.toFile());
-            // env: env array → ProcessBuilder.environment() (clear+populate)
             if (env != null) {
                 pb.environment().clear();
                 for (String kv : env) {
@@ -301,7 +331,6 @@ public class ControlProcessService {
         try { Thread.sleep(secs * 1000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
-    /** 지원 서비스 목록(라우팅 화이트리스트). */
     public static List<String> supportedNames() {
         return Arrays.asList("DGServer_M", "DGServer_S1", "DGServer_S2", "PlatformJS");
     }
