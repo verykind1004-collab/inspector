@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  원본 pages/report.py 의 _yesterday_os_avg + COUNT(*) FROM apm_db_info 와 1:1 동등.
+  Oracle/PG 분기는 databaseId.
+-->
+<mapper namespace="com.exem.inspector.screen.report.ReportMapper">
+
+  <!-- Yesterday OS Average — INSP_OS_HISTORY 컬럼 alias 동일 유지 -->
+  <select id="findYesterdayOsAvg" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT ROUND(AVG(CPU_PERCENT),1) AS "cpu_percent",
+           ROUND(AVG(CPU_USER),1)    AS "cpu_user",
+           ROUND(AVG(CPU_SYSTEM),1)  AS "cpu_system",
+           ROUND(AVG(CPU_IOWAIT),1)  AS "cpu_iowait",
+           ROUND(AVG(MEM_TOTAL_GB),1) AS "mem_total_gb",
+           ROUND(AVG(MEM_USED_GB),1)  AS "mem_used_gb",
+           ROUND(AVG(MEM_FREE_GB),1)  AS "mem_free_gb",
+           ROUND(AVG(MEM_PERCENT),1)  AS "mem_percent",
+           COUNT(*)                   AS "cnt"
+      FROM INSP_OS_HISTORY
+     WHERE COLLECTED_AT &gt;= TO_TIMESTAMP(#{yesterday}, 'YYYY-MM-DD')
+       AND COLLECTED_AT &lt;  TO_TIMESTAMP(#{today}, 'YYYY-MM-DD')
+  </select>
+
+  <select id="findYesterdayOsAvg" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT ROUND(AVG(cpu_percent)::numeric,1)  AS "cpu_percent",
+           ROUND(AVG(cpu_user)::numeric,1)     AS "cpu_user",
+           ROUND(AVG(cpu_system)::numeric,1)   AS "cpu_system",
+           ROUND(AVG(cpu_iowait)::numeric,1)   AS "cpu_iowait",
+           ROUND(AVG(mem_total_gb)::numeric,1) AS "mem_total_gb",
+           ROUND(AVG(mem_used_gb)::numeric,1)  AS "mem_used_gb",
+           ROUND(AVG(mem_free_gb)::numeric,1)  AS "mem_free_gb",
+           ROUND(AVG(mem_percent)::numeric,1)  AS "mem_percent",
+           COUNT(*)                            AS "cnt"
+      FROM insp_os_history
+     WHERE collected_at &gt;= to_timestamp(#{yesterday},'YYYY-MM-DD')
+       AND collected_at &lt;  to_timestamp(#{today},'YYYY-MM-DD')
+  </select>
+
+  <select id="countInstances" resultType="int">
+    SELECT COUNT(*) FROM apm_db_info
+  </select>
+
+  <select id="countValidLicenseDbInfo" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT NVL(SUM(CASE WHEN valid='VALID' THEN 1 ELSE 0 END), 0) AS "valid_cnt",
+           COUNT(*) AS "total"
+      FROM apm_license_db_info
+  </select>
+
+  <select id="countValidLicenseDbInfo" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT COALESCE(SUM(CASE WHEN valid='VALID' THEN 1 ELSE 0 END), 0) AS "valid_cnt",
+           COUNT(*) AS "total"
+      FROM apm_license_db_info
+  </select>
+
+</mapper>
