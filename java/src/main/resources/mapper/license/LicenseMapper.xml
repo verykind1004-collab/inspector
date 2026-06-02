@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  원본 pages/license_check.py 의 _get_license_info / _get_instance_license_status 와 1:1 동등.
+  Oracle/PG 의 차이는 databaseId 분기.
+-->
+<mapper namespace="com.exem.inspector.screen.license.LicenseMapper">
+
+  <!-- License Info — Oracle: NVL + ROWNUM=1 / PG: COALESCE + LIMIT 1 -->
+  <select id="findLicenseInfo" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT a.license_id        AS "license_id",
+           a.license_name      AS "license_name",
+           TO_CHAR(a.last_modified, 'YYYY-MM-DD HH24:MI:SS') AS "modified",
+           NVL((SELECT DISTINCT l.license_type
+                  FROM apm_license_db_info l
+                 WHERE l.license_type IS NOT NULL AND ROWNUM=1), '-') AS "license_type"
+      FROM apm_license a
+     ORDER BY a.license_id
+  </select>
+
+  <select id="findLicenseInfo" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT a.license_id        AS "license_id",
+           a.license_name      AS "license_name",
+           to_char(a.last_modified, 'YYYY-MM-DD HH24:MI:SS') AS "modified",
+           COALESCE((SELECT DISTINCT l.license_type
+                       FROM apm_license_db_info l
+                      WHERE l.license_type IS NOT NULL LIMIT 1), '-') AS "license_type"
+      FROM apm_license a
+     ORDER BY a.license_id
+  </select>
+
+  <!-- Instance License Status — Oracle: NVL+TO_CHAR / PG: COALESCE+to_char + core::text -->
+  <select id="findInstanceLicenseStatus" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT d.db_id          AS "db_id",
+           d.instance_name  AS "instance_name",
+           d.host_ip        AS "host_ip",
+           d.port           AS "port",
+           NVL(l.valid, 'N/A')              AS "valid",
+           NVL(l.license_type, '-')         AS "license_type",
+           NVL(l.license_status, '-')       AS "license_status",
+           NVL(TO_CHAR(l.core), '-')        AS "core",
+           NVL(TO_CHAR(l.last_modified, 'YYYY-MM-DD HH24:MI:SS'), '-') AS "last_check"
+      FROM apm_db_info d
+      LEFT JOIN apm_license_db_info l ON d.db_id = l.db_id
+     ORDER BY d.db_id
+  </select>
+
+  <select id="findInstanceLicenseStatus" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT d.db_id          AS "db_id",
+           d.instance_name  AS "instance_name",
+           d.host_ip        AS "host_ip",
+           d.port           AS "port",
+           COALESCE(l.valid, 'N/A')          AS "valid",
+           COALESCE(l.license_type, '-')     AS "license_type",
+           COALESCE(l.license_status, '-')   AS "license_status",
+           COALESCE(l.core::text, '-')       AS "core",
+           COALESCE(to_char(l.last_modified, 'YYYY-MM-DD HH24:MI:SS'), '-') AS "last_check"
+      FROM apm_db_info d
+      LEFT JOIN apm_license_db_info l ON d.db_id = l.db_id
+     ORDER BY d.db_id
+  </select>
+
+</mapper>
