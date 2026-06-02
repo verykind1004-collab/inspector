@@ -10,7 +10,7 @@
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
 ## 현재 작업
-단순 점검 8 화면 일괄 포팅 완료(누계 11/24). 다음 = 복잡 화면(overview/history/report 등) + 액션 페이지 단계 포팅.
+Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, BE+FE 동시) 완료. 누계 11/24 + overview 부분 포팅. 다음 = overview Services + Disk/Tablespace 카드 → history / report / alarm_history.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -75,18 +75,27 @@
   - SQL 본문은 정식 2604 그대로(SQL*Plus `SET/COLUMN`, psql `\pset` 만 제거). 컬럼 alias 보존(`"DB ID"`, `"INSTANCE NAME"`, `"ALARM NAME"`, `"COUNT"`, `"RTS PORT"`, `"SCHEMA"`, `"TEMP TABLE"` 등).
   - **검증: mvnw test 29 PASS** (22 + SimpleScreen 7), 프론트 build 461 modules 370KB/118KBgz · test 12 PASS · lint 0 errors.
 
+- **Phase B 4차 1단계 — overview System + Vitals 카드 (2026-06-02, BE de5a419 push / FE 미push)**:
+  - 원본 `pages/overview.py` 의 카드형 대시보드 중 System / CPU / Memory 부분을 1:1 동등 포팅 (Disk/Tablespace · Services 카드는 후속 커밋 분리).
+  - **백엔드**(`screen/overview/`): ProcReader(/proc/stat·meminfo·uptime·cpuinfo 파서, CpuStat/MemoryStat 값 객체) + HostInfo(host/os) + OverviewService(_pct_status 임계 60/80, 80/90 보존) + OverviewController(GET `/labs/api/overview/system` static + `/vitals` 폴링 대상).
+  - **프런트**(`features/overview/`): useOverviewSystem(60s cache) + useOverviewVitals(3s 폴링, 원본 _fetchVitals setInterval 등가) + SystemCard + VitalsCards(CPU+Mem) + VitalBadge(ok/warning/critical 톤 emerald/amber/rose) + VitalBar(_bar_dyn 등가). `routes/index.tsx` 가 placeholder → OverviewView 교체.
+  - **MSW 픽스처**: System(inspector-mock host/16 cores) + Vitals(CPU 42% ok, Mem 67% ok) 추가, handlers 등록.
+  - **검증: BE clean test 37 PASS** (29 + 신규 8: ProcReaderTest 3 + OverviewServiceTest 5). **FE test 15 PASS** (12 + VitalBadge 3), build 469 modules 374KB/119KBgz, lint 0 errors.
+
 ## 진행 누계
 - 포팅 완료 화면: **11 / 24** (Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
-- 남은 화면: overview · history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
+- 부분 포팅 화면: **overview** (System + CPU + Memory 카드 BE+FE 완료, Services·Disk/Tablespace 카드 잔여)
+- 남은 화면: overview(잔여 카드) · history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
 
 ## 다음 첫 액션 (Phase B 4차)
-1. 복잡 화면(overview / history / report / alarm_history)부터 단계 포팅 — 다중 SQL/시스템 정보/카드 패턴
-2. 액션 페이지(control_process / script_manager / config_page / config_dump) — POST 액션 포함
-3. license 의 DGS PORT 동적 컬럼 추가(원본 _get_dgs_port_map 로직 — DGServer.xml + log grep)
-4. alert 의 시계열 차트(api_alert_times — 인스턴스/알람별 30일 일별 카운트)
-5. PG 전용 화면 사이드바 조건부 표시(현 dbType 인식)
-6. 프론트 Storybook + Playwright(Summary 1 시나리오)
-7. 병행: auth.py 경로B(DGServer.jar)
+1. **overview 잔여 카드**(우선) = Services(DGServer_M/S, PlatformJS, Client, Repo DB 상태) + Disk/Tablespace(PG 면 OS 디스크, Oracle 이면 Tablespace SQL 카드). `_dg_info / _repodb_info / _tablespace_for_overview` 등 원본 system_utils 포팅.
+2. history / report / alarm_history 복잡 화면 포팅
+3. 액션 페이지(control_process / script_manager / config_page / config_dump) — POST 액션 포함
+4. license 의 DGS PORT 동적 컬럼 추가(원본 _get_dgs_port_map 로직 — DGServer.xml + log grep)
+5. alert 의 시계열 차트(api_alert_times — 인스턴스/알람별 30일 일별 카운트)
+6. PG 전용 화면 사이드바 조건부 표시(현 dbType 인식)
+7. 프론트 Storybook + Playwright(Summary 1 시나리오)
+8. 병행: auth.py 경로B(DGServer.jar)
 
 ## 미해결 결정
 - 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)
