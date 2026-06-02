@@ -11,42 +11,41 @@
 
 ## 현재 작업 (2026-06-02 — 세션 종료 시점 — 다음 세션에서 일괄 재개)
 
-**완료 누계**:
-- 화면 포팅: **14 / 24** (overview 5 카드 + 기존 11 + script_manager + **alert_svc_config** 3종 라우트)
-- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** + alert_svc_config 도 동일 토큰
-- 검증: BE clean test **86 PASS** / FE test **21 PASS** / build SUCCESS / lint 0 errors
+**완료 누계 (2026-06-02 22시 자율 진행 세션)**:
+- 화면 포팅: **21 / 24** (overview 5 카드 + 기존 11 + script_manager + alert_svc_config + **license_check + report + alarm_history + control_process + config_page + config_dump + history**)
+- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** + 모든 신규 화면 동일 토큰
+- 검증: BE clean test **95 PASS** (Report/AlarmHistory/ControlProcess/Config/History 단위는 후속) / FE test **23 PASS** / build SUCCESS / lint 0 errors
+- **누적 라이브 검증 일괄 PASS** — Oracle 인스턴스 복구(`ORACLE_SID=oracle19`, `STARTUP`) + service_config.json SSOT 동기화 + 모든 화면 endpoint 실제 데이터 응답 확인. 사용자 자리비움 동안 자율 진행.
 
 **서버 git 상태 (재개 시 첫 확인)**:
-- BE `release/inspector` (origin push 완료까지는 `ca0be54` / **본 세션 신규 2 commit 은 origin 미push**, setup/foundation 브랜치 — 정확한 hash 는 재개 시 `git log -3 --oneline` 으로 확인)
-- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 본 세션 신규 alert_svc_config FE
-  - FE 로컬 커밋 누적 (10개):
-    ```
-    98d4889 Alert Service Config page (FE) — 본 세션 신규
-    8d6eb02 Script Manager page (FE)
-    45c5349 overview Services 카드 (FE)
-    4c929b0 overview Disk/Tablespace 카드 (FE)
-    0e63b82 디자인시스템 Phase 4 (ScreenTable·filters·page headers)
-    08469d5 디자인시스템 Phase 3 (StatusBadge + sidebar)
-    071823c 디자인시스템 Phase 2 (overview cards)
-    b3ac13f 디자인시스템 Phase 1 (packages + CSS + Pretendard)
-    d575972 overview UI System+Vitals (FE)
-    ae2d4a1 8 simple-check screens (Phase B 3차 FE)
-    ```
+- BE `release/inspector` setup/foundation: `ca0be54` 까지 origin push / **본 세션 신규 8 commit 미 push** (`8194afd` ~ `63465cd`)
+- FE `release/inspector-web` main: 본 세션 신규 7 commit 누적 (10 → **17 commit**)
+  ```
+  2c828b8 History page (FE) — 본 세션 신규
+  1c4c75a Config + Config Dump pages (FE) — 본 세션 신규
+  4bfaf5a Control Process page (FE) — 본 세션 신규
+  44b30c7 Alarm Send History page (FE) — 본 세션 신규
+  926ce4e Daily Report page (FE) — 본 세션 신규
+  2d3b3e8 License Check page (FE) — 본 세션 신규
+  98d4889 Alert Service Config page (FE) — 본 세션 신규
+  8d6eb02 Script Manager page (FE)
+  45c5349..ae2d4a1 (이전 8 commit)
+  ```
 
-**미완 작업 = 12 화면 + 기능보강 + 인프라** (세션 종료 시점에서 다음 세션이 일괄 진행할 항목):
+**미완 작업 = 3 화면 + 기능보강 + 인프라**:
 
-### A. 화면 포팅 (10 화면 — script_manager + alert_svc_config 완료)
+### A. 화면 포팅 (3 화면 — 9 화면 완료)
 | 우선 | 화면 | 원본 라인 | 복잡도 | 비고 |
 |---|---|---:|---|---|
 | ~~1~~ | ~~script_manager~~ | ~~115~~ | ~~medium~~ | **완료(Phase B 5차)** |
-| ~~2~~ | ~~alert_svc_config~~ | ~~373/731~~ | ~~medium~~ | **완료(Phase B 6차)** — SMS/API/Mail 3 라우트 |
-| 3 | **license_check** | 407 | medium | 라이선스 + 인스턴스 정보, DGS PORT 동적 컬럼 보강 별도 |
-| 4 | **report** | 475 | medium-high | Daily Report 카드(어제 OS/Mem/Disk 평균, INSP_OS_HISTORY 의존) |
-| 5 | **alarm_history** | 566 | high | 로그파일 + zip 아카이브 파싱, SMS/API/Mail 송신 이력 |
-| 6 | **control_process** | 574 | high | POST 액션(start/stop/restart) + 프로세스 제어 |
-| 7 | **config_page** | 800 | very high | 폼 렌더 + 저장 |
-| 8 | **config_dump** | 886 | very high | 전체 설정 덤프 |
-| 9 | **history** | 1294 | very high | INSP_*_HISTORY 테이블 + 다중 view + 차트 |
+| ~~2~~ | ~~alert_svc_config~~ | ~~373/731~~ | ~~medium~~ | **완료(Phase B 6차)** |
+| ~~3~~ | ~~license_check~~ | ~~407~~ | ~~medium~~ | **완료(Phase B 7차)** — 3 카드, 라이브 PASS |
+| ~~4~~ | ~~report~~ | ~~475~~ | ~~medium-high~~ | **완료(Phase B 8차)** — 4 카드+Check Status (TBS 차트 후속) |
+| ~~5~~ | ~~alarm_history~~ | ~~566~~ | ~~high~~ | **완료(Phase B 9차)** — SQL+로그/zip 파싱+status 매핑, 212 failed 라이브 추출 |
+| ~~6~~ | ~~control_process~~ | ~~574~~ | ~~high~~ | **완료(Phase B 10차)** — start/stop/restart, .mxgrc 파싱 라이브 PASS (mxg_obsd 통합 후속) |
+| ~~7~~ | ~~config_page~~ | ~~800~~ | ~~very high~~ | **완료(Phase B 11차)** — JSON read/write + connection_test (UI 폼 후속) |
+| ~~8~~ | ~~config_dump~~ | ~~886~~ | ~~very high~~ | **완료(Phase B 11차 통합)** — read-only 3 카드 |
+| ~~9~~ | ~~history~~ | ~~1294~~ | ~~very high~~ | **완료(Phase B 12차)** — INSP_*_HISTORY 5 view (차트 후속) |
 | 10 | char_setting | (없음) | — | 원본 미존재 — 스킵 또는 정의 확정 후 |
 | 11 | disk(vacuum_log) | unknown | medium~high | 정확한 원본 파일 확인 필요 |
 | 12 | partition 관리 | unknown | medium~high | 정확한 원본 파일 확인 필요 |
