@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  원본 pages/history.py 의 5 view (OS/TBS/Service/QCnt/Summary). 본 단계는 핵심 컬럼 + 최근 days 일.
+  컬럼 alias 는 원본 INSP_* 테이블 그대로(소문자).
+-->
+<mapper namespace="com.exem.inspector.screen.history.HistoryMapper">
+
+  <select id="findOsHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           cpu_percent  AS "cpu_percent",
+           cpu_user     AS "cpu_user",
+           cpu_system   AS "cpu_system",
+           cpu_iowait   AS "cpu_iowait",
+           mem_total_gb AS "mem_total_gb",
+           mem_used_gb  AS "mem_used_gb",
+           mem_percent  AS "mem_percent"
+      FROM INSP_OS_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findOsHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           cpu_percent, cpu_user, cpu_system, cpu_iowait,
+           mem_total_gb, mem_used_gb, mem_percent
+      FROM insp_os_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+  <select id="findTbsHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           tbs_name AS "tbs_name", used_gb AS "used_gb",
+           total_gb AS "total_gb", free_gb AS "free_gb", used_percent AS "used_percent"
+      FROM INSP_TBS_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findTbsHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           tbs_name, used_gb, total_gb, free_gb, used_percent
+      FROM insp_tbs_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+  <select id="findServiceHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           service_name AS "service_name", status AS "status"
+      FROM INSP_SERVICE_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findServiceHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           service_name, status
+      FROM insp_service_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+  <select id="findQcntHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           qcnt AS "qcnt"
+      FROM INSP_QCNT_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findQcntHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           qcnt
+      FROM insp_qcnt_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+  <select id="findSummaryHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           summary_type AS "summary_type", instance_name AS "instance_name", status AS "status"
+      FROM INSP_SUMMARY_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findSummaryHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           summary_type, instance_name, status
+      FROM insp_summary_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+</mapper>
