@@ -3,15 +3,29 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <!--
-  Summary Check 진단 SQL. databaseId 로 Oracle/PG 분기(I절 — 화면 코드에 분기를 흩뿌리지 않음).
-  원본: 기존 Python sql_library.py (_SQL_SUMMARY_*, _SQL_PG_SUMMARY_*).
-  SQL*Plus/psql 지시어(SET/COLUMN)는 JDBC 무관이라 제거. 컬럼 alias 는
-  map-underscore-to-camel-case 로 SummaryRow 필드에 매핑(db_id -> dbId 등).
+  Summary Check 진단 SQL. databaseId 로 Oracle/PG 분기(원본의 db_type 분기와 동등).
+  원본: Labs 변형(release/inspector/Labs/Inspector/python-utils/sql_library.py)
+        _SQL_SUMMARY_10MIN / _SQL_SUMMARY_1HOUR / _SQL_PG_SUMMARY_10MIN / _SQL_PG_SUMMARY_1HOUR
+
+  1:1 동등 포팅 원칙:
+   - SQL 본문(WHERE/JOIN/CASE/컬럼 alias/세미콜론 외 모든 토큰)을 원본 그대로 유지.
+   - 제거 가능한 것은 JDBC 무관 부분뿐 = SQL*Plus 지시어(SET/COLUMN), psql 메타.
+   - ResultSet 라벨 -> SummaryRow 필드는 resultMap 으로 명시(원본 alias 보존).
 -->
 <mapper namespace="com.exem.inspector.screen.summary.SummaryMapper">
 
-    <!-- ── 10Min Summary ───────────────────────────────────────────── -->
-    <select id="findSummary10Min" resultType="com.exem.inspector.screen.summary.SummaryRow" databaseId="oracle">
+    <!-- 원본 alias 보존: "DB ID"/INSTANCE_NAME/SUMMARY_TYPE/LAST_SUMMARY/STATUS/DELAY_INFO -->
+    <resultMap id="summaryRow" type="com.exem.inspector.screen.summary.SummaryRow">
+        <result column="DB ID"        property="dbId"/>
+        <result column="INSTANCE_NAME" property="instanceName"/>
+        <result column="SUMMARY_TYPE"  property="summaryType"/>
+        <result column="LAST_SUMMARY"  property="lastSummary"/>
+        <result column="STATUS"        property="status"/>
+        <result column="DELAY_INFO"    property="delayInfo"/>
+    </resultMap>
+
+    <!-- ── 10Min Summary (Oracle) — _SQL_SUMMARY_10MIN ──────────────────── -->
+    <select id="findSummary10Min" resultMap="summaryRow" databaseId="oracle">
         WITH expect AS (
             SELECT TRUNC(SYSDATE,'HH24')
                  + ((FLOOR(TO_NUMBER(TO_CHAR(SYSDATE,'MI'))/10)*10)-10)/1440 AS expected_time,
@@ -19,18 +33,18 @@
         sum_raw AS (
             SELECT a.db_id, a.instance_name, b.summary_type, b.summary_time, e.expected_time,
                    CASE WHEN b.summary_time IS NULL THEN 'CHECK'
-                        WHEN b.summary_time = e.expected_time THEN 'OK'
-                        WHEN TRUNC(b.summary_time) = e.today THEN 'WAITING'
+                        WHEN b.summary_time=e.expected_time THEN 'OK'
+                        WHEN TRUNC(b.summary_time)=e.today THEN 'WAITING'
                         ELSE 'CHECK' END AS status
             FROM apm_db_info a
-            LEFT JOIN ora_last_summary b ON a.db_id = b.server_id AND b.summary_type LIKE '%10Min%'
+            LEFT JOIN ora_last_summary b ON a.db_id=b.server_id AND b.summary_type LIKE '%10Min%'
             CROSS JOIN expect e)
         SELECT
-            db_id        AS db_id,
-            instance_name AS instance_name,
-            summary_type  AS summary_type,
-            TO_CHAR(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS last_summary,
-            status        AS status,
+            db_id AS "DB ID",
+            instance_name AS INSTANCE_NAME,
+            summary_type  AS SUMMARY_TYPE,
+            TO_CHAR(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS LAST_SUMMARY,
+            status AS STATUS,
             CASE
                 WHEN status = 'OK' THEN NULL
                 WHEN status = 'WAITING' THEN
@@ -39,12 +53,15 @@
                 WHEN status = 'CHECK' AND summary_time IS NOT NULL THEN
                     '+' || CEIL(expected_time - summary_time) || 'd'
                 ELSE NULL
-            END AS delay_info
+            END AS DELAY_INFO
         FROM sum_raw
-        ORDER BY summary_time ASC NULLS FIRST, db_id ASC
+        ORDER BY
+            summary_time ASC NULLS FIRST,
+            db_id ASC
     </select>
 
-    <select id="findSummary10Min" resultType="com.exem.inspector.screen.summary.SummaryRow" databaseId="postgresql">
+    <!-- ── 10Min Summary (PostgreSQL) — _SQL_PG_SUMMARY_10MIN ───────────── -->
+    <select id="findSummary10Min" resultMap="summaryRow" databaseId="postgresql">
         WITH expect AS (
             SELECT date_trunc('hour', localtimestamp)
                    + (((extract(minute from localtimestamp)::int / 10) * 10) - 10) * interval '1 minute' AS expected_time,
@@ -61,11 +78,11 @@
             CROSS JOIN expect e
         )
         SELECT
-            db_id        AS db_id,
-            instance_name AS instance_name,
-            summary_type  AS summary_type,
-            to_char(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS last_summary,
-            status        AS status,
+            db_id AS "DB ID",
+            instance_name AS INSTANCE_NAME,
+            summary_type AS SUMMARY_TYPE,
+            to_char(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS LAST_SUMMARY,
+            status AS STATUS,
             CASE
                 WHEN status = 'OK' THEN NULL
                 WHEN status = 'WAITING' THEN
@@ -74,13 +91,15 @@
                 WHEN status = 'CHECK' AND summary_time IS NOT NULL THEN
                     '+' || ceil(extract(epoch from (date_trunc('day', expected_time) - date_trunc('day', summary_time))) / 86400.0)::int || 'd'
                 ELSE NULL
-            END AS delay_info
-        FROM sum_raw
-        ORDER BY summary_time ASC NULLS FIRST, db_id ASC
+            END AS DELAY_INFO
+          FROM sum_raw
+         ORDER BY
+          summary_time ASC NULLS FIRST,
+          db_id ASC
     </select>
 
-    <!-- ── 1Hour (Daily) Summary ───────────────────────────────────── -->
-    <select id="findSummary1Hour" resultType="com.exem.inspector.screen.summary.SummaryRow" databaseId="oracle">
+    <!-- ── 1Hour (Daily) Summary (Oracle) — _SQL_SUMMARY_1HOUR ──────────── -->
+    <select id="findSummary1Hour" resultMap="summaryRow" databaseId="oracle">
         WITH expect AS (
             SELECT TRUNC(SYSDATE - INTERVAL '1' HOUR, 'HH24') AS expected_time,
                    TRUNC(SYSDATE) AS today FROM dual),
@@ -94,22 +113,25 @@
             LEFT JOIN ora_last_summary b ON a.db_id = b.server_id AND b.summary_type LIKE '%Daily%'
             CROSS JOIN expect e)
         SELECT
-            db_id        AS db_id,
-            instance_name AS instance_name,
-            summary_type  AS summary_type,
-            TO_CHAR(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS last_summary,
-            status        AS status,
+            db_id AS "DB ID",
+            instance_name AS INSTANCE_NAME,
+            summary_type  AS SUMMARY_TYPE,
+            TO_CHAR(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS LAST_SUMMARY,
+            status AS STATUS,
             CASE
                 WHEN status = 'OK' THEN NULL
                 WHEN status = 'WAITING' THEN '+' || ROUND((expected_time - summary_time) * 24) || 'h'
                 WHEN status = 'CHECK' AND summary_time IS NOT NULL THEN '+' || CEIL(expected_time - summary_time) || 'd'
                 ELSE NULL
-            END AS delay_info
+            END AS DELAY_INFO
         FROM sum_raw
-        ORDER BY summary_time ASC NULLS FIRST, db_id ASC
+        ORDER BY
+            summary_time ASC NULLS FIRST,
+            db_id ASC
     </select>
 
-    <select id="findSummary1Hour" resultType="com.exem.inspector.screen.summary.SummaryRow" databaseId="postgresql">
+    <!-- ── 1Hour (Daily) Summary (PostgreSQL) — _SQL_PG_SUMMARY_1HOUR ───── -->
+    <select id="findSummary1Hour" resultMap="summaryRow" databaseId="postgresql">
         WITH expect AS (
             SELECT date_trunc('hour', localtimestamp - interval '1 hour') AS expected_time,
                    date_trunc('day', localtimestamp) AS today
@@ -125,11 +147,11 @@
             CROSS JOIN expect e
         )
         SELECT
-            db_id        AS db_id,
-            instance_name AS instance_name,
-            summary_type  AS summary_type,
-            to_char(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS last_summary,
-            status        AS status,
+            db_id AS "DB ID",
+            instance_name AS INSTANCE_NAME,
+            summary_type AS SUMMARY_TYPE,
+            to_char(summary_time, 'YYYY-MM-DD HH24:MI:SS') AS LAST_SUMMARY,
+            status AS STATUS,
             CASE
                 WHEN status = 'OK' THEN NULL
                 WHEN status = 'WAITING' THEN
@@ -137,9 +159,11 @@
                 WHEN status = 'CHECK' AND summary_time IS NOT NULL THEN
                     '+' || ceil(extract(epoch from (date_trunc('day', expected_time) - date_trunc('day', summary_time))) / 86400.0)::int || 'd'
                 ELSE NULL
-            END AS delay_info
-        FROM sum_raw
-        ORDER BY summary_time ASC NULLS FIRST, db_id ASC
+            END AS DELAY_INFO
+          FROM sum_raw
+         ORDER BY
+          summary_time ASC NULLS FIRST,
+          db_id ASC
     </select>
 
 </mapper>

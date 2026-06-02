@@ -6,8 +6,9 @@
 ## 0. 한눈에
 
 - 프로젝트: 기존 MaxGauge Inspector Labs를 재구현(rewrite). **풀스택 — 백엔드(Java) + 프론트(React SPA)를 모두 우리가 구축한다.**
-- **핵심 목표: 다양한 DB 성능분석 화면을 통일된 UI·화면구조·백엔드로 계속 추가할 수 있는 확장 플랫폼을 만든다.** 단순 1:1 포팅이 아니다. (규약은 I절)
-- 부차 목적: 보안 취약점 개선 + 기존 MaxGauge 제품과 스택 통일(백엔드 Java, 프론트는 MaxGauge VI 표준)
+- **핵심 목표: 기존 Inspector Labs 의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능한 것 = **개발 스택·언어·디자인·보안요소** 뿐. 기능·화면 구성·SQL·설정 파일·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** (포팅 규약은 I절)
+- **포팅 베이스(SSOT)**: `release/inspector/Labs/Inspector/python-utils/` — Labs 변형(2311 라인 + 2026-04 PG 스키마 인식 패치). MaxGauge 정식 빌드(2311/2407/2604)들과는 SQL 일부가 다름. 이 트리가 우리 정본이다.
+- 부차 목적: 보안 취약점 개선(SHA256 → 강한 알고리즘 등) + 기존 MaxGauge 제품과 스택 통일(백엔드 Java, 프론트는 MaxGauge VI 표준)
 - 기존 Python/HTTP/HTML 코드(`Labs/`)는 "참조 명세"이며 수정 대상이 아니다 (순수 `http.server` 기반 — README의 "FastAPI" 표기는 부정확)
 - 신규 코드: 백엔드 `java/`(Spring Boot REST API) + 프론트(React SPA, 별도 레포). `Labs/`는 참조만.
 - 백엔드 개발은 반드시 이 서버에서 수행한다 (MaxGauge 연동 필수). 프론트는 API 모킹(MSW)으로 분리 개발 가능.
@@ -114,15 +115,28 @@
 - 임의 임계값/하드코딩 회피책 금지 — 근본 해결 우선.
 - 삭제 작업은 사용자 확인 필수.
 - `main` 직접 작업 금지 — 작업 브랜치에서 진행한다.
+- **원본(Labs/pages/, sql_library.py 등)에 없는 새 화면·새 기능 추가 금지**(0절 핵심 목표).
+- **SQL 본문 임의 변경 금지** — JDBC 무관 부분(SQL*Plus `SET/COLUMN`, psql `\` 메타) 외에는 원본 그대로(컬럼 alias·공백·세미콜론 제외 토큰 보존). 결과 매핑은 MyBatis `resultMap` 으로.
+- **설정 파일 스키마 임의 변경 금지** — `service_config.json`, `insp_config.json`, nginx conf 등 키 셋·의미를 원본과 동일하게 유지(보안값/포맷 강화는 허용).
+- **인증/세션/OS 수집/파티션 정책 등 동작 임의 변경 금지** — 단 보안 요소(SHA256→BCrypt 등)는 허용.
 
-## I. 분석화면 추가 규약 (확장 플랫폼의 핵심)
+## I. 화면 포팅 규약 (1:1 동등 + 공통화 강제)
 
-새 DB 성능분석 화면을 추가할 때 아래를 반드시 따른다. 일관성은 권장이 아니라 규약이다.
-기존 Python의 실패 지점 = 공통화 미강제(html_helpers를 안 거쳐 화면마다 제각각). 이를 **구조로 강제**한다.
+원본 화면(`Labs/Inspector/python-utils/pages/`)을 Java(백엔드) + React(프론트)로 옮길 때 따른다. **신규 화면 추가가 아니라 기존 화면의 충실 이식**임을 명심한다.
 
-**한 화면 = 백엔드 1세트 + 프론트 1세트**
+기존 Python의 약점 = 공통화 미강제(`html_helpers`를 안 거쳐 화면마다 제각각). 재구현에선 이를 **구조로 강제**해 동일 기능을 더 일관되게 제공한다. 공통화는 **품질 원칙**이며 **새 화면 추가의 정당화로 쓰지 않는다**.
+
+**한 원본 화면 = 백엔드 1세트 + 프론트 1세트**
 - 백엔드: `[Controller + Service + Mapper(+동적이면 JdbcTemplate)] → 표준 JSON 응답`. 화면이 SQL/커넥션을 직접 다루지 않는다.
 - 프론트: `feature`(FSD) 하나가 **공통 컴포넌트를 조합**한다. 화면이 UI를 직접 조립하지 않는다.
+
+**SQL 충실 이식 (백엔드)**
+- 베이스 = `release/inspector/Labs/Inspector/python-utils/sql_library.py` (Labs 변형, 0절 SSOT).
+- 원본 `_SQL_*` 상수 본문을 **문자 그대로** mapper XML 에 옮긴다. 컬럼 alias("DB ID", INSTANCE_NAME, …) 보존.
+- 허용 변경: SQL*Plus 지시어 제거(`SET LINESIZE`, `COLUMN ... FORMAT`), psql `\` 메타 제거, 다중문 `$$ LANGUAGE plpgsql;` 분리(JDBC 단일문). 그 외 토큰 변경 금지.
+- 결과 매핑: 원본 alias → Java 필드는 `resultMap` 명시. `map-underscore-to-camel-case` 우회 의존 금지.
+- `db_type` 분기(Oracle/PG) → MyBatis `databaseId` 분기. 두 벌 다 유지.
+- `db_id` 등 정수 인자: 원본의 문자열 보간 → PreparedStatement 바인딩 + 정수 검증(SQL 인젝션 방어, 보안 요소).
 
 **UI 공통화 2층 (프론트, React SPA)**
 - 1층 = **EXEM UI Design System**(`@exem-fe/*`): 토큰·기본 컴포넌트. 범용, 그대로 소비.
@@ -133,4 +147,8 @@
 - 응답은 **표준 JSON 스키마**를 따른다(컬럼 메타 + 행 + STATUS/DELAY 등 도메인 필드) → 2층 테이블 렌더러가 일관 소비.
 - DB 접근은 공통 추상화 계층(MyBatis databaseId)을 경유. Oracle/PG 분기를 화면 코드에 흩뿌리지 않는다.
 - 인증/보안은 Spring Security가 일괄 적용. 화면별 수동 인증 체크 금지.
-- 단순 SQL 점검 화면은 메타데이터(SQL+컬럼정의) 기반 공통 처리로 일반화한다 (기존 `_db_page` 패턴).
+- 단순 SQL 점검 화면은 메타데이터(SQL+컬럼정의) 기반 공통 처리로 일반화한다 (기존 `_db_page` 패턴 — 원본에 이미 있는 방식).
+
+**원본 화면 인벤토리(목표 = 전부 포팅)**
+- `Labs/Inspector/python-utils/pages/` 의 라우터 24개(summary·session·capacity·license·alert·query·top_segment·temp_table·vacuum·age·overview·history·report·alarm_history·alert_svc_config·config_page·config_dump·control_process·script_manager·char_setting 등). 누락 없이 모두.
+- 누락·차이 발견 시 `PROGRESS.md` 차단 요인 / 미해결 결정에 기록.

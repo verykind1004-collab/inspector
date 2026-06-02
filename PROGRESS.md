@@ -1,10 +1,12 @@
 # PROGRESS — MaxGauge Inspector Labs (Java 재구현)
 
-## 핵심 목표 (재정의됨)
-단순 1:1 포팅이 아니라, **다양한 DB 성능분석 화면을 통일된 UI·화면구조·백엔드로 계속 추가할 수 있는 확장 플랫폼** 구축. **풀스택(백엔드 Java + 프론트 React SPA, 둘 다 우리가 구축).** 규약은 CLAUDE.md I절.
+## 핵심 목표 (2026-06-02 재정의 — 1:1 동등 포팅)
+**기존 Inspector Labs(release/inspector/Labs/, Labs 변형 2311+PG패치)의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능 = **스택·언어·디자인·보안** 만. 기능·화면 구성·SQL 본문·설정 파일 스키마·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** 풀스택(백엔드 Java + 프론트 React SPA). 규약 = CLAUDE.md 0/H/I절.
+
+이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 24개 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
 ## 현재 작업
-3단계 첫 화면(Summary Check) 백엔드 + **표준 JSON 응답 스키마** 구현 완료(미커밋) → 다음은 프론트 레포 부트스트랩 + 실 저장소 런타임 검증.
+3.5 단계(원칙 재정렬 + SQL alias 정정) 완료 직후 → Phase B(ADR 0001 스택 풀세트 + 24개 화면 단계 포팅).
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -27,26 +29,36 @@
   - 미구현/TODO: ①auth.py 경로B(DB 사용자=apm_user_list+DGServer.jar 복호화) ②세션 절대만료 ③CSRF·쿠키Secure·BCrypt 보안개선
 - **1·2단계 커밋(c938e7d) + ADR 0001(프론트 SPA·풀스택·UI 공통화 2층) 커밋(1f154a7)** — `setup/foundation`. `docs/decisions/0001-frontend-spa-and-fullstack-scope.md` 추가, 헌법 0·C·D·G·I절 갱신(I절=SPA 2층 규약 재작성). `templates/` 제거 완료(SPA 확정). **두 커밋 모두 origin 미push 상태.**
 
-- **표준 JSON 응답 스키마 + 첫 화면(Summary Check) 백엔드 (3단계, 2026-05-22, 미커밋)**:
-  - **표준 표 응답 계약**(`common/web/screen/`): `ScreenResponse`(meta+columns+rows) + `ColumnDef`(key/label/type/role/hidden) + `ColumnType`(STRING/NUMBER/DATETIME) + `ColumnRole`(PLAIN/ID/INSTANCE/GROUP/STATUS/DELAY) + `ScreenMeta`. 행=컬럼 key 맵. 2층 공통 테이블 렌더러가 이 스키마만 보고 렌더(I절 — 화면마다 제각각 금지). 표준 봉투 `common/web/ApiResponse`(ok/error/data — 기존 _warn_box 분기 통일)
-  - **Summary Check 화면 1세트**(`screen/summary/`): `SummaryController`(`/labs/api/summary/10min`·`/1hour`) → `SummaryService`(매퍼행→표준응답, 컬럼메타 화면고정, 미설정 시 IllegalStateException) → `SummaryMapper`(@Mapper, ObjectProvider 선택주입) + `mapper/summary/SummaryMapper.xml`(databaseId Oracle/PG 두 벌, sql_library.py 충실 포팅, SQL*Plus/psql 지시어 제거). `SummaryRow`(db_id/instance_name/summary_type/last_summary/status/delay_info)
-  - 컬럼 계약 확정: DB ID(ID) / Instance Name(INSTANCE·필터) / Summary Type(GROUP·칩) / Last Summary(DATETIME) / Status(STATUS·배지 OK/CHECK/WAITING/ERROR) / Delay(DELAY·hidden·툴팁)
-  - **검증: `clean test` BUILD SUCCESS, 19 tests PASS** (기존 13 + ScreenResponseTest 3[빌더·검증·JSON직렬화형태고정] + SummaryServiceTest 3[행변환·미설정예외·빈결과])
-  - **런타임 검증 보류(환경)**: 라이브 MaxGauge 저장소 접속정보 부재(service_config.json repository 블록 공란). 내부 테스트 Oracle(ORA19)에는 apm_db_info/ora_last_summary 미존재 → 실 매퍼 런타임 검증은 저장소 접속정보 확보 후
+- **표준 JSON 응답 스키마 + 첫 화면(Summary Check) 백엔드 + push (3단계, 2026-05-22, b20a41f)**:
+  - **표준 표 응답 계약**(`common/web/screen/`): `ScreenResponse`(meta+columns+rows) + `ColumnDef`(key/label/type/role/hidden) + `ColumnType` + `ColumnRole`(PLAIN/ID/INSTANCE/GROUP/STATUS/DELAY) + `ScreenMeta`. 표준 봉투 `common/web/ApiResponse`(ok/error/data)
+  - **Summary Check 화면**(`screen/summary/`): Controller(`/labs/api/summary/10min`·`/1hour`) → Service(매퍼행→표준응답, ObjectProvider 선택주입) → `@Mapper` + XML(databaseId Oracle/PG 두 벌)
+  - 컬럼 계약: DB ID(ID) / Instance Name(INSTANCE·필터) / Summary Type(GROUP·칩) / Last Summary(DATETIME) / Status(STATUS·배지 OK/CHECK/WAITING/ERROR) / Delay(DELAY·hidden·툴팁)
+  - **검증: clean test BUILD SUCCESS, 19 tests PASS**
+  - 라이브 저장소 런타임 검증은 당시 보류로 보고했으나 **사실 환경에 접속정보 충분**(3.5 단계에서 정정)
+
+- **버전 분기 검토 + 1:1 동등 원칙 재정렬 + SQL alias 정정 (3.5 단계, 2026-06-02, 미커밋)**:
+  - 검토 결과: 명시적 if-else 버전 분기 없음. 빌드별 sql_library.py 분리 방식. **2311 vs 2407+ 두 라인**(2407=2506=2604 동일), 주로 PG 파티션 SQL 차이.
+  - 우리 베이스(`release/inspector/Labs/`)는 **Labs 변형 = 2311 라인 + 2026-04 PG 스키마 인식 패치**. 정식 빌드 어느 것과도 다름. Summary SQL md5 확인 결과 정식 라인은 동일·우리 베이스는 별개. → **베이스 = Labs 변형 확정**(사용자 결정).
+  - **헌법 재정리**: CLAUDE.md 0절 "확장 플랫폼" 도그마 폐기 → "1:1 동등 포팅" 명문화. I절 제목·본문 재작성("화면 포팅 규약 1:1 동등 + 공통화 강제", SQL 충실 이식 원칙, 원본 24개 화면 인벤토리 명시). H절에 신규 화면·기능 추가 금지/SQL 본문 임의 변경 금지/설정 스키마 변경 금지 추가.
+  - **SQL alias 정정**: SummaryMapper.xml 4개 select 의 컬럼 alias 를 소문자 통일 → 원본(`"DB ID"`/INSTANCE_NAME/SUMMARY_TYPE/LAST_SUMMARY/STATUS/DELAY_INFO) 그대로. resultMap 도입으로 alias→필드 명시 매핑(map-underscore-to-camel-case 우회 의존 제거). SQL 의미는 본래도 동일이었고 alias만 정정.
+  - **환경 인지 정정**: 라이브 저장소 접속정보 공란이라 보고했던 것은 잘못. `/home/inspector/ORACLE/{2311,2407,2506,2604}/Inspector/python-utils/service_config.json` 등에 mxg2604@10.10.45.136:1521/ORACLE19 등 전 버전 접속정보(비번 평문) 보유. 리스너 TCP_OK 확인. apm_db_info·ora_last_summary 는 실 운영 저장소에 존재 → **실 저장소 런타임 검증 즉시 가능**.
 
 ## 다음 첫 액션 (새 세션에서 이어갈 때 여기부터)
-1. 3단계 결과 커밋(표준 JSON 스키마 + Summary 화면) → setup/foundation, 누적 3커밋 origin push 결정
-2. **실 저장소 런타임 검증**: MaxGauge 저장소 접속정보(service_config.json repository) 확보 → `spring-boot:run` + 로그인 후 `/labs/api/summary/10min` 응답 확인(DataSource→SqlSessionFactory→매퍼 활성 + 표준 JSON 실측). 불가 시 ORA19에 apm_db_info/ora_last_summary 최소 시드
-3. 프론트 레포 부트스트랩(Vite+React+FSD, 위치 TBD) — 2층 공통 테이블 렌더러(ScreenResponse 소비) + Summary feature 첫 화면
-4. 두 번째 화면(session) 동일 규약으로 추가 — 표준 스키마 일반성 검증(컬럼 가변)
-5. 병행: auth.py 경로B(DB 사용자 인증) — DGServer.jar 복호화 분석 후
+**Phase A (3.5 단계 정리 — 즉시 처리)**
+1. mapper alias 정정 + 헌법·PROGRESS 재정리 정정 커밋 + push (브랜치 `setup/foundation`)
+2. clean test 19 PASS 유지 확인
+
+**Phase B (1:1 동등 원칙 하 풀세트 구현)**
+3. 백엔드 실 저장소 런타임 검증 — mxg2604(또는 2311 가동 중 라인) service_config.json 작성 → `spring-boot:run` + 로그인 → `/labs/api/summary/10min` 표준 JSON 실측
+4. 프론트 풀세트(ADR 0001 스택 전부) — TanStack Router(파일 기반) + MSW(dev+test) + Radix(2층 atom 보강) + Storybook + Playwright(1 시나리오: Summary 로딩→필터→정렬) + dev 프록시(:8083) + 2층 ScreenTable 렌더러 + Summary feature/page
+5. 두 번째 화면 포팅(session) — 동일 규약 검증
+6. 나머지 22 화면 단계 포팅(원본 인벤토리 따라 — capacity/license/alert/query/top_segment/temp_table/vacuum/age/overview/history/report/alarm_history/alert_svc_config/config_page/config_dump/control_process/script_manager/char_setting 등)
+7. 병행: auth.py 경로B(DB 사용자 인증) — DGServer.jar 복호화 분석
 
 ## 미해결 결정
-- 프론트 레포 위치/원격 (TBD)
-- 표준 JSON 스키마 1차 확정(3단계). 정렬/페이징/필터 서버위임 여부는 대용량 화면 실증 시 재검토
-- char_setting 라우팅 미연결 처리 (재구현 시 반영)
-- 후속 분석 필요: INSP_* 테이블 DDL, MXG_* DB함수 (구현 직전). summary SQL 본문은 3단계에서 확보·포팅 완료
-- **오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요**: 고객사 외부 인터넷 차단 + 검증 오픈소스만 허용. 최종 jar 포함 의존성이 검증 대상. ①Oracle ojdbc8 라이선스(OTN) ②Spring Boot 전이의존성 CVE/SBOM ③폐쇄망 사내 미러(Nexus/Artifactory) 필요 여부
+- 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)
+- INSP_* 테이블 DDL, MXG_* DB함수 — 화면 포팅 시점에 케이스별 확보
+- **오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요**: 고객사 외부 인터넷 차단 + 검증 오픈소스만 허용. ①Oracle ojdbc8(OTN) ②Spring Boot 전이의존성 SBOM ③폐쇄망 사내 미러(Nexus)
 
 ## 차단 요인
-- 실 저장소 런타임 검증: MaxGauge 저장소 접속정보 부재(환경) — 접속정보 확보 또는 테스트 DB 시드 필요
+- 없음(라이브 저장소 검증 차단 요인 해소). `@exem-fe/*` 레지스트리만 프론트 1층 교체 시점에 필요(개발팀 대기, 임시 컴포넌트로 진행 가능)
