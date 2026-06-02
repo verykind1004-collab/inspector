@@ -9,8 +9,12 @@
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
-## 현재 작업
-Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, BE+FE 동시) 완료. 누계 11/24 + overview 부분 포팅. 다음 = overview Services + Disk/Tablespace 카드 → history / report / alarm_history.
+## 현재 작업 (일시 정지 — 디자인시스템 대기, 2026-06-02)
+Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, BE+FE 동시) 완료. 누계 11/24 + overview 부분 포팅.
+
+**재개 조건**: EXEM UI 디자인시스템(`@exem-fe/*`, GitLab 모노레포) 을 사용자가 받아와 프런트 `shared/ui` 어댑터로 1층 교체한 뒤 재개.
+- 현 FE 컴포넌트(`VitalBadge / VitalBar / SystemCard / VitalsCards / OverviewView`) 는 임시 Tailwind 직조립 — 디자인시스템 도입 시 시각 디테일 일괄 재정렬 예정(구조는 1:1 보존).
+- 디자인시스템 적용 후 다음 = overview Services + Disk/Tablespace 카드 → history / report / alarm_history.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -103,4 +107,12 @@ Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, B
 - **오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요**: 고객사 외부 인터넷 차단 + 검증 오픈소스만 허용. ①Oracle ojdbc8(OTN) ②Spring Boot 전이의존성 SBOM ③폐쇄망 사내 미러(Nexus)
 
 ## 차단 요인
-- 없음(라이브 저장소 검증 차단 요인 해소). `@exem-fe/*` 레지스트리만 프론트 1층 교체 시점에 필요(개발팀 대기, 임시 컴포넌트로 진행 가능)
+- **(2026-06-02 활성) EXEM UI 디자인시스템(`@exem-fe/*`) 미수령** — 사용자가 GitLab 모노레포에서 받아와 적용 예정. 적용 전까지 본 Phase 일시 정지.
+- 라이브 저장소 검증은 차단 요인 아님(해소됨).
+- 임시 FE 컴포넌트(`VitalBadge` 등 Tailwind 직조립)는 디자인시스템 도입 시 어댑터 통한 1층 교체 예정. 구조는 변경 없음.
+
+## 재개 후 첫 액션 체크리스트
+1. EXEM 디자인시스템 패키지 `@exem-fe/*` 수령 후 `shared/ui` 에 어댑터 신설 (ADR 0001 §UI 공통화 2층).
+2. 본 세션의 임시 컴포넌트(VitalBadge/VitalBar/SystemCard/VitalsCards) 어댑터 경유로 교체 — 외부 인터페이스(props) 보존, 시각만 디자인시스템 토큰 반영.
+3. FE local 커밋 `d575972` (overview UI BE+FE) 확인 (FE remote 미등록 — 폴리레포 + 디자인시스템 정렬 대기 상태).
+4. overview 잔여 카드(Services + Disk/Tablespace) 포팅 재개.
