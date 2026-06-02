@@ -9,12 +9,16 @@
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
-## 현재 작업 (일시 정지 — 디자인시스템 대기, 2026-06-02)
+## 현재 작업 (2026-06-02 — EXEM 디자인시스템 적용 Phase 1~3 완료, 화면 포팅 재개 준비됨)
 Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, BE+FE 동시) 완료. 누계 11/24 + overview 부분 포팅.
 
-**재개 조건**: EXEM UI 디자인시스템(`@exem-fe/*`, GitLab 모노레포) 을 사용자가 받아와 프런트 `shared/ui` 어댑터로 1층 교체한 뒤 재개.
-- 현 FE 컴포넌트(`VitalBadge / VitalBar / SystemCard / VitalsCards / OverviewView`) 는 임시 Tailwind 직조립 — 디자인시스템 도입 시 시각 디테일 일괄 재정렬 예정(구조는 1:1 보존).
-- 디자인시스템 적용 후 다음 = overview Services + Disk/Tablespace 카드 → history / report / alarm_history.
+**EXEM 디자인시스템 적용 (FE)**: `gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 maxgauge-vi 패턴을 미러. 3 phase 적용:
+- Phase 1 (FE local 다음 d575972 이후): `@exem-ui/{core,react,tailwindcss4}` npm 설치 + Pretendard 4 woff2 + `src/index.css` 디자인시스템 진입 정렬
+- Phase 2: overview 컴포넌트(VitalBadge=Tag, VitalBar=Progress, SystemCard/VitalsCards/OverviewView 토큰화)
+- Phase 3: StatusBadge=Tag (기존 11 화면 영향), `__root.tsx` 사이드바 토큰화
+- 검증: pnpm test 15 PASS / build SUCCESS / lint 0 errors
+
+**다음 = overview 잔여 카드 + 신규 복잡 화면 포팅 재개**: Services + Disk/Tablespace → history / report / alarm_history.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -86,6 +90,14 @@ Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, B
   - **MSW 픽스처**: System(inspector-mock host/16 cores) + Vitals(CPU 42% ok, Mem 67% ok) 추가, handlers 등록.
   - **검증: BE clean test 37 PASS** (29 + 신규 8: ProcReaderTest 3 + OverviewServiceTest 5). **FE test 15 PASS** (12 + VitalBadge 3), build 469 modules 374KB/119KBgz, lint 0 errors.
 
+- **EXEM 디자인시스템 풀스택 미러 — Phase 1~3 적용 (2026-06-02, FE local 3 commits, push 없음)**:
+  - **출처**: `gitlab.exem.xyz/fe1/design-studio-temp` (PAT 클론) + 서브모듈 `external/maxgauge-vi`(참조 구현) + `external/exem-table`. 메인 패키지 `@exem-ui/{core,react,tailwindcss4}` 는 공개 npmjs.org 에 있음.
+  - **Phase 1 — 인프라**: `package.json` 에 `@exem-ui/core@^0.3.3` + `@exem-ui/react@^0.3.4` + `@exem-ui/tailwindcss4@^0.3.2` 추가. Pretendard 4 weight woff2 (`src/assets/font/pretendard/`) 복사 (출처 maxgauge-vi, SIL OFL 1.1). `src/index.css` 디자인시스템 진입 정렬 (`@import @exem-ui/core/css` + `@exem-ui/tailwindcss4` + `@exem-ui/react/styles` + Pretendard `@font-face` × 4 + `font-pretendard` utility + `*` base `@apply`).
+  - **Phase 2 — overview 컴포넌트 교체**: `VitalBadge` → `@exem-ui/react` `Tag` (ok=green / warning=amber / critical=red, type=fill). `VitalBar` → `Progress` (size=small, `gaugeClassName=bg-{green/amber/red}-05`). `SystemCard / VitalsCards / OverviewView` 토큰화 (`bg-gray-00 / border-gray-02 / text-gray-{05,06,10} / text-body-{2,3} / rounded-strong / text-header-2`). 테스트 갱신.
+  - **Phase 3 — 공통 표면 교체**: `StatusBadge` (기존 11 화면 영향) → `Tag` 위임 (OK→green, CHECK/ERROR→red, WAITING→amber, 그외→mono). 툴팁 내부 토큰화. `__root.tsx` 사이드바 토큰화 (sky-06 active, sky-01 hover, gray-{00..07,10}). `GroupHeading` 분리.
+  - **검증 (각 Phase 별)**: pnpm test 15 PASS / pnpm build SUCCESS (CSS 22KB→85KB w/디자인시스템 / JS 374KB→573KB w/@exem-ui/react / Pretendard 4종 3.1MB 자동 번들) / pnpm lint 0 errors.
+  - **미반영 / Phase 4+ 후속**: `@exem-fe/react-table` (npm 비공개, 서브모듈+link 필요), `ScreenTable / InstanceFilter / GroupChips` 토큰화, 페이지 헤더 토큰화, Storybook+Playwright.
+
 ## 진행 누계
 - 포팅 완료 화면: **11 / 24** (Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
 - 부분 포팅 화면: **overview** (System + CPU + Memory 카드 BE+FE 완료, Services·Disk/Tablespace 카드 잔여)
@@ -107,12 +119,13 @@ Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, B
 - **오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요**: 고객사 외부 인터넷 차단 + 검증 오픈소스만 허용. ①Oracle ojdbc8(OTN) ②Spring Boot 전이의존성 SBOM ③폐쇄망 사내 미러(Nexus)
 
 ## 차단 요인
-- **(2026-06-02 활성) EXEM UI 디자인시스템(`@exem-fe/*`) 미수령** — 사용자가 GitLab 모노레포에서 받아와 적용 예정. 적용 전까지 본 Phase 일시 정지.
-- 라이브 저장소 검증은 차단 요인 아님(해소됨).
-- 임시 FE 컴포넌트(`VitalBadge` 등 Tailwind 직조립)는 디자인시스템 도입 시 어댑터 통한 1층 교체 예정. 구조는 변경 없음.
+- **(2026-06-02 해소) EXEM UI 디자인시스템 미수령** — `gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 Phase 1~3 적용으로 해소.
+- 라이브 저장소 검증은 차단 요인 아님(해소).
+- 잔여: `@exem-fe/react-table` 공개 npm 미공개 — 서브모듈+link 필요(테이블 화면 마이그 시점에 검토).
 
 ## 재개 후 첫 액션 체크리스트
-1. EXEM 디자인시스템 패키지 `@exem-fe/*` 수령 후 `shared/ui` 에 어댑터 신설 (ADR 0001 §UI 공통화 2층).
-2. 본 세션의 임시 컴포넌트(VitalBadge/VitalBar/SystemCard/VitalsCards) 어댑터 경유로 교체 — 외부 인터페이스(props) 보존, 시각만 디자인시스템 토큰 반영.
-3. FE local 커밋 `d575972` (overview UI BE+FE) 확인 (FE remote 미등록 — 폴리레포 + 디자인시스템 정렬 대기 상태).
-4. overview 잔여 카드(Services + Disk/Tablespace) 포팅 재개.
+1. (Phase 4+) `ScreenTable / InstanceFilter / GroupChips` 디자인시스템 토큰화 — 기존 11 화면 시각 정렬.
+2. 페이지 헤더 토큰화 (SimpleScreenPage 등) — text-header-2 / text-body-3.
+3. (선택) `@exem-fe/react-table` 서브모듈 + link 도입 검토 — 대용량 화면 가상화 필요 시.
+4. overview 잔여 카드(Services + Disk/Tablespace) 포팅 — BE `screen/overview/` 에 `ServicesService` + `TablespaceService` 추가, FE 카드 컴포넌트 추가.
+5. history / report / alarm_history 복잡 화면 포팅.
