@@ -9,16 +9,18 @@
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
-## 현재 작업 (2026-06-02 — EXEM 디자인시스템 적용 Phase 1~3 완료, 화면 포팅 재개 준비됨)
-Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, BE+FE 동시) 완료. 누계 11/24 + overview 부분 포팅.
+## 현재 작업 (2026-06-02 — overview 화면 100% 완성, 디자인시스템 Phase 1~4 적용 완료)
+**overview 화면 5/5 카드 완성**: System + CPU + Memory + Disk/Tablespace + Services. 누계 12/24 (overview 1 + 기존 11).
 
-**EXEM 디자인시스템 적용 (FE)**: `gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 maxgauge-vi 패턴을 미러. 3 phase 적용:
-- Phase 1 (FE local 다음 d575972 이후): `@exem-ui/{core,react,tailwindcss4}` npm 설치 + Pretendard 4 woff2 + `src/index.css` 디자인시스템 진입 정렬
+**EXEM 디자인시스템 적용 (FE) Phase 1~4 완료** (`gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 maxgauge-vi 패턴 미러):
+- Phase 1: `@exem-ui/{core,react,tailwindcss4}` npm 설치 + Pretendard 4 woff2 + `src/index.css` 진입 정렬
 - Phase 2: overview 컴포넌트(VitalBadge=Tag, VitalBar=Progress, SystemCard/VitalsCards/OverviewView 토큰화)
 - Phase 3: StatusBadge=Tag (기존 11 화면 영향), `__root.tsx` 사이드바 토큰화
-- 검증: pnpm test 15 PASS / build SUCCESS / lint 0 errors
+- Phase 4: ScreenTable / InstanceFilter / GroupChips / 페이지 헤더(SimpleScreenPage / Summary{10Min,1Hour} / SessionPage) 토큰화
 
-**다음 = overview 잔여 카드 + 신규 복잡 화면 포팅 재개**: Services + Disk/Tablespace → history / report / alarm_history.
+**검증** (각 Phase 별): BE `mvnw clean test` 47 PASS (37 + overview Services 5 + Disk 5) / FE `pnpm test` 15 PASS / `pnpm build` SUCCESS / `pnpm lint` 0 errors.
+
+**다음 = 신규 복잡/액션 화면 포팅**: history(1294 라인) · report(475) · alarm_history(566 라인, 로그파일+zip 파싱) · 액션 페이지 4종 · 기타 5종.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -98,20 +100,29 @@ Phase B 4차 1단계 — overview 화면 첫 컷(System + CPU + Memory 카드, B
   - **검증 (각 Phase 별)**: pnpm test 15 PASS / pnpm build SUCCESS (CSS 22KB→85KB w/디자인시스템 / JS 374KB→573KB w/@exem-ui/react / Pretendard 4종 3.1MB 자동 번들) / pnpm lint 0 errors.
   - **미반영 / Phase 4+ 후속**: `@exem-fe/react-table` (npm 비공개, 서브모듈+link 필요), `ScreenTable / InstanceFilter / GroupChips` 토큰화, 페이지 헤더 토큰화, Storybook+Playwright.
 
-## 진행 누계
-- 포팅 완료 화면: **11 / 24** (Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
-- 부분 포팅 화면: **overview** (System + CPU + Memory 카드 BE+FE 완료, Services·Disk/Tablespace 카드 잔여)
-- 남은 화면: overview(잔여 카드) · history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
+- **Phase B 4차 2단계 — overview Disk/Tablespace + Services 카드 (2026-06-02, BE f8a7976+6c4c0bd push / FE local 4c929b0+45c5349 미push)**:
+  - **Disk/Tablespace** (BE f8a7976): Oracle = `_SQL_ORACLE_TABLESPACE_OVERVIEW` 다중 테이블스페이스 + overall 상태, PG = `pg_data_dir`(미설정 시 "/") `Files.getFileStore` stat. `RepositoryConfig.pgDataDir` 추가. `OverviewDiskMapper` + xml(Oracle/PG databaseId 분기) + `OverviewDiskService` + `TablespaceRow`. 테스트 5건.
+  - **Services** (BE 6c4c0bd): DGServer_M/S* + PlatformJS + Client + Repo DB 행 구성. `ServicesBlock`(service_config services 블록), `PortChecker`(TCP listen), `DgServerXmlReader`(정규식 단일 태그), `VersionReader`(home/version 파일). 본 단계는 TCP listen 만(원본 ss/netstat+ps DG_NAME 폴백 미적용). 테스트 5건.
+  - **FE**: `useOverviewDisk`(60s cache) + `DiskCard`(Tablespace 다중/PG 단일 분기) + `useOverviewServices`(3초 폴링) + `ServicesCard`(Tag 상태배지 표). MSW 픽스처 + 핸들러 갱신. `OverviewView` 4열 그리드 + Services 카드 col-span-full.
+  - **검증**: BE clean test 47 PASS (37→42→47). FE test 15 PASS, build SUCCESS, lint 0 errors.
 
-## 다음 첫 액션 (Phase B 4차)
-1. **overview 잔여 카드**(우선) = Services(DGServer_M/S, PlatformJS, Client, Repo DB 상태) + Disk/Tablespace(PG 면 OS 디스크, Oracle 이면 Tablespace SQL 카드). `_dg_info / _repodb_info / _tablespace_for_overview` 등 원본 system_utils 포팅.
-2. history / report / alarm_history 복잡 화면 포팅
-3. 액션 페이지(control_process / script_manager / config_page / config_dump) — POST 액션 포함
-4. license 의 DGS PORT 동적 컬럼 추가(원본 _get_dgs_port_map 로직 — DGServer.xml + log grep)
-5. alert 의 시계열 차트(api_alert_times — 인스턴스/알람별 30일 일별 카운트)
-6. PG 전용 화면 사이드바 조건부 표시(현 dbType 인식)
-7. 프론트 Storybook + Playwright(Summary 1 시나리오)
-8. 병행: auth.py 경로B(DGServer.jar)
+- **Phase B 4차 3단계 — 디자인시스템 Phase 4 적용 (2026-06-02, FE local 0e63b82 미push)**:
+  - `ScreenTable` 토큰화 (bg-gray-{00,01,03} / border-gray-{02,03} / text-gray-{05..10} / text-body-3 + text-caption / hover sky-{01,07} / rounded-strong)
+  - `InstanceFilter` 토큰화 (bg-gray-01 + focus sky-05 / rounded-medium)
+  - `GroupChips` 토큰화 (활성 sky-06, 비활성 gray-00+border-gray-02)
+  - 페이지 헤더 6개(SimpleScreenPage / Summary{10Min,1Hour} / SessionPage) — `text-header-2` + `text-body-3`
+  - 검증: pnpm test 15 PASS / build SUCCESS / lint 0 errors.
+
+## 진행 누계
+- **포팅 완료 화면: 12 / 24** (overview + Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
+- **남은 화면 (12)**: history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
+
+## 다음 첫 액션
+1. **복잡 화면 포팅** — history(1294 라인, INSP_*_HISTORY 테이블 + 다중 view) · report(475 라인, Daily Report 카드) · alarm_history(566 라인, 로그파일+zip 파싱)
+2. **액션 페이지** — control_process(574) / script_manager(115, SELECT-only SQL runner) / config_page(800) / config_dump(886). POST 액션 + 권한 분기 포함
+3. **기타** — alert_svc_config(373) · license_check(407) · disk(vacuum_log) · partition 관리
+4. **기능 보강** — license DGS PORT 동적 컬럼 / alert 시계열 차트 / PG 전용 사이드바 조건부 / auth.py 경로B(DGServer.jar 복호화)
+5. **FE Storybook + Playwright** — 1 시나리오 시드
 
 ## 미해결 결정
 - 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)
