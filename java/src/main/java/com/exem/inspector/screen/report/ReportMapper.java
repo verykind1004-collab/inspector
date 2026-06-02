@@ -1,13 +1,13 @@
 package com.exem.inspector.screen.report;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * Report 화면 SQL — INSP_OS_HISTORY 어제 평균 + apm_db_info 인스턴스 카운트.
+ * Report 화면 SQL — 원본 report.py + insp_oracle/insp_pg 의 monthly_summary 와 1:1 동등.
  */
 @Mapper
 public interface ReportMapper {
@@ -21,9 +21,13 @@ public interface ReportMapper {
             @Param("yesterday") String yesterday,
             @Param("today") String today);
 
-    /** apm_db_info 인스턴스 카운트(원본 _inst_out). */
+    /** apm_db_info 인스턴스 카운트 (원본 _inst_out). */
     int countInstances();
 
-    /** apm_license_db_info 의 valid 카운트(VALID / NONE 등 그룹) — Check Status License 행 결정용. */
-    Map<String, Object> countValidLicenseDbInfo();
+    /**
+     * INSP_MONTHLY_SUMMARY 년도별 조회 — 원본 insp_query_monthly_summary / insp_pg_query_monthly_summary.
+     * 반환 행: year_month, cpu_avg, mem_avg, mem_used_gb, mem_total_gb,
+     *        disk_avg, disk_used_gb, disk_total_gb
+     */
+    List<LinkedHashMap<String, Object>> findMonthlyResourceSummary(@Param("yearPrefix") String yearPrefix);
 }

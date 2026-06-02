@@ -2,12 +2,13 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  원본 pages/report.py 의 _yesterday_os_avg + COUNT(*) FROM apm_db_info 와 1:1 동등.
+  원본 pages/report.py 의 _yesterday_os_avg + COUNT(*) FROM apm_db_info +
+  insp_oracle/insp_pg 의 query_monthly_summary 와 1:1 동등.
   Oracle/PG 분기는 databaseId.
 -->
 <mapper namespace="com.exem.inspector.screen.report.ReportMapper">
 
-  <!-- Yesterday OS Average — INSP_OS_HISTORY 컬럼 alias 동일 유지 -->
+  <!-- ── Yesterday OS Average — INSP_OS_HISTORY ───────────────────────────── -->
   <select id="findYesterdayOsAvg" resultType="java.util.LinkedHashMap" databaseId="oracle">
     SELECT ROUND(AVG(CPU_PERCENT),1) AS "cpu_percent",
            ROUND(AVG(CPU_USER),1)    AS "cpu_user",
@@ -38,20 +39,38 @@
        AND collected_at &lt;  to_timestamp(#{today},'YYYY-MM-DD')
   </select>
 
+  <!-- ── Instances count ──────────────────────────────────────────────────── -->
   <select id="countInstances" resultType="int">
     SELECT COUNT(*) FROM apm_db_info
   </select>
 
-  <select id="countValidLicenseDbInfo" resultType="java.util.LinkedHashMap" databaseId="oracle">
-    SELECT NVL(SUM(CASE WHEN valid='VALID' THEN 1 ELSE 0 END), 0) AS "valid_cnt",
-           COUNT(*) AS "total"
-      FROM apm_license_db_info
+  <!-- ── Monthly Resource Summary — INSP_MONTHLY_SUMMARY ──────────────────── -->
+  <select id="findMonthlyResourceSummary" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT YEAR_MONTH    AS "year_month",
+           CPU_AVG       AS "cpu_avg",
+           MEM_AVG       AS "mem_avg",
+           MEM_USED_GB   AS "mem_used_gb",
+           MEM_TOTAL_GB  AS "mem_total_gb",
+           DISK_AVG      AS "disk_avg",
+           DISK_USED_GB  AS "disk_used_gb",
+           DISK_TOTAL_GB AS "disk_total_gb"
+      FROM INSP_MONTHLY_SUMMARY
+     WHERE YEAR_MONTH LIKE #{yearPrefix}
+     ORDER BY YEAR_MONTH
   </select>
 
-  <select id="countValidLicenseDbInfo" resultType="java.util.LinkedHashMap" databaseId="postgresql">
-    SELECT COALESCE(SUM(CASE WHEN valid='VALID' THEN 1 ELSE 0 END), 0) AS "valid_cnt",
-           COUNT(*) AS "total"
-      FROM apm_license_db_info
+  <select id="findMonthlyResourceSummary" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT year_month    AS "year_month",
+           cpu_avg       AS "cpu_avg",
+           mem_avg       AS "mem_avg",
+           mem_used_gb   AS "mem_used_gb",
+           mem_total_gb  AS "mem_total_gb",
+           disk_avg      AS "disk_avg",
+           disk_used_gb  AS "disk_used_gb",
+           disk_total_gb AS "disk_total_gb"
+      FROM insp_monthly_summary
+     WHERE year_month LIKE #{yearPrefix}
+     ORDER BY year_month
   </select>
 
 </mapper>

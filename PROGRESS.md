@@ -228,3 +228,33 @@
 2. A 표 2번 alert_svc_config(373) 또는 3번 license_check(407) 포팅 — 폼 + 검증 + 저장(POST 액션 두 번째 사례).
 3. (선택) `@exem-fe/react-table` 서브모듈 + link 도입 검토 — 대용량 화면(history) 가상화 필요 시.
 4. history / report / alarm_history 복잡 화면 포팅.
+
+---
+
+## 2026-06-02 야간 세션 — Screen 4 report 1:1 동등 복원 (보강)
+
+**배경**: 직전 세션 commit `f8bd9a9` "port Daily Report (16/24) — 4 cards + Check Status + Services (TBS chart 후속)" 는 원본 `pages/report.py` 5블록 중 3블록 미구현. 핸드오프가 명시한 "TBS chart / 사인오프 저장 endpoint / 특이사항 저장 endpoint" 3종은 원본에 존재하지 않음 (인쇄용 PDF 보고서, 모든 입력 클라이언트 사이드 contenteditable + 인쇄 직전 사용자 직접 입력).
+
+**원본 정밀 재분석 결과 실제 GAP**:
+1. 4 stat 카드 4번째 = Instances (직전 Java 는 License — 자율 변경)
+2. 고객사명 / 지원제품 contentEditable 행 누락
+3. Check Resource 12개월 × 3행(CPU/Mem/TBS) `_monthly_resource_data(year)` 표 전체 누락 — 핸드오프의 "TBS chart" 는 사실 이 표
+4. Check Status `STATUS_GROUPS` 4그룹 17항목 → 9 행 평면 단순화 (자율 변경)
+5. Services 별도 표 = 원본 없음, 자율 추가
+
+**보강 내용**:
+- BE: ReportPayload 전면 재작성 (license/services/checks 제거 → monthly + statusGroups + nested types) / ReportMapper.findMonthlyResourceSummary 신규 (Oracle+PG INSP_MONTHLY_SUMMARY 매핑) / ReportService LicenseService 의존 제거, buildMonthly+buildStatusGroups 신규 / **ReportServiceTest 8 테스트 신규**
+- FE: features/report/api/use-report.ts (ReportPayload interface 재정의) / index.ts type re-export 갱신 / mocks/fixtures/report.ts 새 구조 / pages/report/ReportPage.tsx 5블록 재구조화 (cust 행, ResourceRow 12개월 표, StatusGroupRows rowspan) / **ReportPage.test.tsx 4 테스트 신규**
+
+**검증**:
+- BE clean test: 95 → **103 PASS** (+8)
+- FE test: 23 → **27 PASS** (+4)
+- FE build: SUCCESS (JS 618 KB)
+- FE lint: 0 errors / 4 warnings (기존)
+- 라이브: `POST /labs/api/login (maxgauge/test1!)` 200 OK · `GET /labs/api/report` monthly 12개 + statusGroups 4그룹 1:1 응답 / `GET :5173/report` 200
+
+**미반영 사항 (원본에 없으므로 미추가)**:
+- 특이사항/사인오프/고객사명/지원제품 저장 endpoint — 원본은 인쇄 직전 사용자 입력 + 인쇄로 처리, 서버 저장 없음
+- TBS History 30일 SVG bar chart — 원본 report.py 에 함수 자체 없음. 12개월 Check Resource 표가 동등 시각 요소
+
+**다음 = Screen 2 (alarm_history) 보강** — 직전 commit `83b1e0a` 압축 항목 재확인 후 1:1 동등 복원.
