@@ -10,7 +10,7 @@
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
 ## 현재 작업
-3.5 단계(원칙 재정렬 + SQL alias 정정 + 베이스 정식 2604 라인 전환) 완료 직후 → Phase B(ADR 0001 스택 풀세트 + 24개 화면 단계 포팅).
+Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 완료 → Phase B 2차(Storybook + Playwright + 나머지 22 화면 단계 포팅).
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -45,23 +45,33 @@
   - **헌법 재정리**: CLAUDE.md 0절 "확장 플랫폼" 도그마 폐기 → "1:1 동등 포팅" 명문화. I절 재작성. H절에 금지 항목 추가. SummaryMapper.xml alias 원복(`"DB ID"`/INSTANCE_NAME 등)+resultMap.
   - **환경 인지 정정**: 라이브 저장소 접속정보 보유 확인(`/home/inspector/ORACLE/*/Inspector/python-utils/service_config.json`, mxg2604@10.10.45.136:1521/ORACLE19 등). TCP_OK. **실 저장소 런타임 검증 즉시 가능**.
 
-- **베이스 정식 2604 라인 전환 + Summary SQL 재정정 (3.6 단계, 2026-06-02, 미커밋)**:
+- **베이스 정식 2604 라인 전환 + Summary SQL 재정정 (3.6 단계, 2026-06-02, edff242 push)**:
   - **사용자 결정 재정정(2026-06-02)**: "버전은 2407~2604 등등 모든 버전을 만족해야 함" → 베이스 = Labs 변형(2311+패치) → **정식 2604 라인으로 변경**. 2407=2506=2604 SQL 동일이라 단일 셋으로 2407+ 전 버전 커버.
   - **SSOT 갱신**: Oracle `/home/inspector/ORACLE/2604/Inspector/python-utils/sql_library.py` / PG `/home/inspector/PG/2604/Labs/Inspector/python-utils/sql_library.py`. CLAUDE.md 0절·I절 SSOT 표기 갱신.
   - **SummaryMapper.xml 재정정**: 정식 2604 라인 본문(md5 `b9c31c07`·`74757197`·`1baa19c1`·`cc8b50a7`)으로 4개 select 재포팅. **핵심 차이 = ORDER BY**(정식은 상태 우선순위 CHECK→WAITING→OK + 보조키, Labs 변형은 summary_time NULLS FIRST + db_id). 운영상 정식이 더 합리적. resultMap 그대로.
   - 컬럼 alias·CASE 본문 등 나머지는 동일.
 
-## 다음 첫 액션 (새 세션에서 이어갈 때 여기부터)
-**Phase A2 (3.6 단계 정리 — 즉시 처리)**
-1. mapper 정식 2604 재정정 + 헌법·PROGRESS 베이스 갱신 정정 커밋 + push (브랜치 `setup/foundation`)
-2. clean test 19 PASS 유지 확인
+- **Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 (2026-06-02, 미커밋)**:
+  - **실 저장소 라이브 검증 완료 (mxg2604@10.10.45.136:1521/ORACLE19)**:
+    - `java/config/service_config.json` 작성(ORACLE/2604 의 repository 블록 복사, .gitignore 처리)
+    - `spring-boot:run` 기동 OK. DataSource 구성 로그 확인 — `리포지토리 DataSource 구성: ORACLE jdbc:oracle:thin:@//10.10.45.136:1521/ORACLE19`
+    - 로그인: POST `/labs/api/login` `{"id":"maxgauge","password":"..."}` → 200 `{"role":"engineer","id":"maxgauge","ok":true}`
+    - `/labs/api/summary/10min` 200 실 응답 3행(ORACLE19 OS Stat/DB Stat/DB Wait 10Min, 모두 CHECK +41d 마지막 2026-04-22)
+    - `/labs/api/summary/1hour` 200 실 응답 7행(Daily 카테고리 7개, 모두 CHECK +42d)
+    - 표준 봉투(ApiResponse)+표준 표(ScreenResponse, columns 6/3개+rows+meta) 구조 정확. ORDER BY CHECK→WAITING→OK 적용 확인
+    - **주의/배운 점**: `-Dspring-boot.run.arguments` 와 환경변수(`SPRING_APPLICATION_JSON`/`INSPECTOR_AUTH_ADMIN_HASH`)는 spring-boot-maven-plugin 2.7 에서 forked JVM 으로 잘 전파되지 않음. 검증 시 application.yml 임시 변경 → 검증 → 원복 패턴 사용. LoginRequest 필드명은 `id`(원본 auth.py 보존, 프론트 호출 시 동일)
+  - **Session Check 화면(2번째 화면) 포팅**: `screen/session/`
+    - SQL 원본 = 정식 2604 _SQL_SESSION (Oracle) / _SQL_PG_SESSION (PG: `SELECT * FROM insp_session_check() ORDER BY last_time ASC`)
+    - 컬럼 = DB ID(ID) / INSTANCE_NAME(INSTANCE 필터) / LAST_TIME(DATETIME). STATUS/DELAY 없음 — 2층 ScreenTable 이 자동 대응(STATUS 컬럼 부재 시 일반 td 렌더)
+    - 구성: SessionMapper(@Mapper databaseId Oracle/PG) + XML + resultMap + SessionRow + SessionService(ObjectProvider 선택주입) + SessionController(GET `/labs/api/session`) + SessionServiceTest(3 tests)
+  - **검증: clean test 22 PASS** (기존 19 + Session 3)
 
-**Phase B (1:1 동등 원칙 하 풀세트 구현)**
-3. 백엔드 실 저장소 런타임 검증 — mxg2604(또는 2311 가동 중 라인) service_config.json 작성 → `spring-boot:run` + 로그인 → `/labs/api/summary/10min` 표준 JSON 실측
-4. 프론트 풀세트(ADR 0001 스택 전부) — TanStack Router(파일 기반) + MSW(dev+test) + Radix(2층 atom 보강) + Storybook + Playwright(1 시나리오: Summary 로딩→필터→정렬) + dev 프록시(:8083) + 2층 ScreenTable 렌더러 + Summary feature/page
-5. 두 번째 화면 포팅(session) — 동일 규약 검증
-6. 나머지 22 화면 단계 포팅(원본 인벤토리 따라 — capacity/license/alert/query/top_segment/temp_table/vacuum/age/overview/history/report/alarm_history/alert_svc_config/config_page/config_dump/control_process/script_manager/char_setting 등)
-7. 병행: auth.py 경로B(DB 사용자 인증) — DGServer.jar 복호화 분석
+## 다음 첫 액션 (Phase B 2차)
+1. 프론트 Storybook init + stories(Button/StatusBadge/GroupChips/InstanceFilter/ScreenTable)
+2. 프론트 Playwright config + Summary 1 시나리오(로딩→인스턴스 필터→정렬)
+3. 나머지 22 원본 화면 단계 포팅(원본 인벤토리: capacity/license/alert/query/top_segment/temp_table/vacuum/age/overview/history/report/alarm_history/alert_svc_config/config_page/config_dump/control_process/script_manager/char_setting 등)
+4. 병행: auth.py 경로B(DB 사용자 인증) — DGServer.jar 복호화 분석
+5. EXEM `@exem-fe/*` 레지스트리 확보 시점 shared/ui adapter 교체
 
 ## 미해결 결정
 - 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)

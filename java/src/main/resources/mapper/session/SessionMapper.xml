@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  Session Check 진단 SQL. databaseId 로 Oracle/PG 분기.
+  원본(SSOT, 정식 2604 라인):
+   - Oracle: ORACLE/2604/Inspector/python-utils/sql_library.py  _SQL_SESSION
+   - PG    : PG/2604/Labs/Inspector/python-utils/sql_library.py _SQL_PG_SESSION
+
+  1:1 동등 포팅. 본문 그대로(컬럼 alias·ORDER BY 보존). SQL*Plus 지시어(COLUMN ... FORMAT) 만 제거.
+-->
+<mapper namespace="com.exem.inspector.screen.session.SessionMapper">
+
+    <resultMap id="sessionRow" type="com.exem.inspector.screen.session.SessionRow">
+        <result column="DB ID"        property="dbId"/>
+        <result column="INSTANCE_NAME" property="instanceName"/>
+        <result column="LAST_TIME"     property="lastTime"/>
+    </resultMap>
+
+    <!-- Oracle — _SQL_SESSION -->
+    <select id="findSession" resultMap="sessionRow" databaseId="oracle">
+        WITH seg_pk AS (
+          SELECT TO_NUMBER(SUBSTR(s.partition_name, 2, 9)) AS partition_key,
+                 TO_NUMBER(SUBSTR(s.partition_name, 8, 3)) AS db_id
+            FROM dba_segments s
+           WHERE s.owner        = USER
+             AND s.segment_name = 'ORA_SESSION_LIST_COUNT'
+             AND REGEXP_LIKE(s.partition_name, '^P[0-9]{9}$')
+        ),
+        max_pk AS (
+          SELECT db_id, MAX(partition_key) AS max_pk
+            FROM seg_pk
+           GROUP BY db_id
+        )
+        SELECT d.db_id AS "DB ID",
+               d.instance_name,
+               MAX(s.time) AS last_time
+          FROM apm_db_info d
+          LEFT JOIN max_pk m ON m.db_id = d.db_id
+          LEFT JOIN ora_session_list_count s
+                 ON s.db_id = d.db_id
+                AND s.partition_key = m.max_pk
+         GROUP BY d.db_id, d.instance_name
+         ORDER BY last_time ASC
+    </select>
+
+    <!-- PostgreSQL — _SQL_PG_SESSION -->
+    <select id="findSession" resultMap="sessionRow" databaseId="postgresql">
+        SELECT * FROM insp_session_check() ORDER BY last_time ASC
+    </select>
+
+</mapper>

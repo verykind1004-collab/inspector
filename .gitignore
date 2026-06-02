@@ -60,3 +60,4 @@ Labs/Inspector/python-utils/data/*
 
 # Java 빌드 산출물
 java/target/
+java/config/
