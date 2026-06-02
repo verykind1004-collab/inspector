@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exem.inspector.screen.alarmhistory.AlarmHistoryMapper">
+
+  <!-- Oracle — 원본 _SQL_ORACLE_ALARM_SEND 와 본문 동일(epoch_ms = (time - 1970-01-01) * 86400 - tz_offset * 1000) -->
+  <select id="findAlarms" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT a.instance_name AS "instance_name",
+           TO_CHAR(h.time, 'YYYY-MM-DD HH24:MI:SS') AS "alert_time",
+           ((h.time - TO_DATE('1970-01-01','YYYY-MM-DD')) * 86400
+            - (EXTRACT(TIMEZONE_HOUR FROM SYSTIMESTAMP) * 3600
+               + EXTRACT(TIMEZONE_MINUTE FROM SYSTIMESTAMP) * 60)
+           ) * 1000 AS "alert_epoch",
+           DECODE(h.type, 1, 'Server Alert', 2, 'Stat Alert', 'Type '||h.type) AS "alert_type",
+           h.name AS "alert_name",
+           TO_CHAR(h.value) AS "alert_value"
+      FROM apm_db_info a
+      JOIN ora_alarm_history h ON a.db_id = h.db_id
+     WHERE h.sms_flag = '1'
+       AND h.time &gt;= TO_DATE(#{selDate}, 'YYYY-MM-DD')
+       AND h.time &lt;  TO_DATE(#{selDate}, 'YYYY-MM-DD') + 1
+     ORDER BY h.time DESC
+     FETCH FIRST 500 ROWS ONLY
+  </select>
+
+  <!-- PG: 원본은 PL/pgSQL 함수를 매번 CREATE OR REPLACE 후 호출. 우리는 함수가 사전 배포돼 있다고 가정하고 SELECT 만. -->
+  <select id="findAlarms" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT * FROM insp_alarm_send_check_lite(#{selDate}::date) LIMIT 500
+  </select>
+
+</mapper>
