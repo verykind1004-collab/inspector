@@ -12,15 +12,16 @@
 ## 현재 작업 (2026-06-02 — 세션 종료 시점 — 다음 세션에서 일괄 재개)
 
 **완료 누계**:
-- 화면 포팅: **12 / 24** (overview 5 카드 + 기존 11: Summary 10Min/1Hour, Session, capacity, license, alert, query, top_segment, temp_table, vacuum, age)
-- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** (`@exem-ui/{core,react,tailwindcss4}` + Pretendard + 12 화면 시각 정렬)
-- 검증: BE clean test **47 PASS** / FE test **15 PASS** / build SUCCESS / lint 0 errors
+- 화면 포팅: **13 / 24** (overview 5 카드 + 기존 11: Summary 10Min/1Hour, Session, capacity, license, alert, query, top_segment, temp_table, vacuum, age + **script_manager**)
+- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** (`@exem-ui/{core,react,tailwindcss4}` + Pretendard + 12 화면 시각 정렬 — script_manager 도 동일 토큰)
+- 검증: BE clean test **70 PASS** / FE test **18 PASS** / build SUCCESS / lint 0 errors
 
 **서버 git 상태 (재개 시 첫 확인)**:
-- BE `release/inspector` (origin push 완료, setup/foundation 브랜치): 최신 `ca0be54`
-- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 최신 `45c5349`
-  - FE 로컬 커밋 누적 (재시작 후 그대로 보존):
+- BE `release/inspector` (origin push 완료까지는 `ca0be54` / **본 세션 신규 HEAD 1 commit 은 origin 미push**, setup/foundation 브랜치 — 정확한 hash 는 재개 시 `git log -3 --oneline` 으로 확인)
+- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 최신 `8d6eb02`
+  - FE 로컬 커밋 누적 (재시작 후 그대로 보존, 9개):
     ```
+    8d6eb02 Script Manager page (FE) — 본 세션 신규
     45c5349 overview Services 카드 (FE)
     4c929b0 overview Disk/Tablespace 카드 (FE)
     0e63b82 디자인시스템 Phase 4 (ScreenTable·filters·page headers)
@@ -33,10 +34,10 @@
 
 **미완 작업 = 12 화면 + 기능보강 + 인프라** (세션 종료 시점에서 다음 세션이 일괄 진행할 항목):
 
-### A. 화면 포팅 (12 화면)
+### A. 화면 포팅 (11 화면 — script_manager 완료)
 | 우선 | 화면 | 원본 라인 | 복잡도 | 비고 |
 |---|---|---:|---|---|
-| 1 | **script_manager** | 115 | medium | SELECT-only SQL runner + 보안 prefix 검증 + POST |
+| ~~1~~ | ~~script_manager~~ | ~~115~~ | ~~medium~~ | ~~SELECT-only SQL runner~~ — **완료(Phase B 5차)** |
 | 2 | **alert_svc_config** | 373 | medium | SMS/API/Mail 설정 |
 | 3 | **license_check** | 407 | medium | 라이선스 + 인스턴스 정보, DGS PORT 동적 컬럼 보강 별도 |
 | 4 | **report** | 475 | medium-high | Daily Report 카드(어제 OS/Mem/Disk 평균, INSP_OS_HISTORY 의존) |
@@ -65,11 +66,11 @@
 - INSP_* 테이블 DDL · MXG_* DB 함수 — 화면 포팅 시점 케이스별 확보
 - 오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요(고객사 외부 인터넷 차단)
 
-## 세션 종료 시점 가동 상태 (2026-06-02 18:02~ 기동)
-- BE Spring Boot 2.7.18 / JDK 8 — `:8083` 가동 중 (`/tmp/inspector-be.log`, PID 4676)
+## 세션 종료 시점 가동 상태 (2026-06-02 19:10~ 재기동)
+- BE Spring Boot 2.7.18 / JDK 8 — `:8083` 가동 중 (`/tmp/inspector-be.log`, PID 11498)
 - FE Vite dev — `:5173` 가동 중 (`/tmp/inspector-fe.log`, PID 6150)
 - 접속: SSH 터널 `ssh -L 15173:localhost:5173 -p 22022 inspector@10.10.45.136` → `http://localhost:15173/`
-- 정지: `pkill -f "spring-boot:run"; pkill -f vite`
+- 정지: `pkill -9 -f InspectorApplication; pkill -9 -f vite`
 
 ## 재개 후 첫 액션 (다음 세션이 자율 진행)
 
@@ -180,16 +181,28 @@
   - 페이지 헤더 6개(SimpleScreenPage / Summary{10Min,1Hour} / SessionPage) — `text-header-2` + `text-body-3`
   - 검증: pnpm test 15 PASS / build SUCCESS / lint 0 errors.
 
+- **Phase B 5차 — script_manager 화면 포팅 (2026-06-02, BE 미push / FE 미push)**:
+  - 원본 `pages/script_manager.py` (Oracle/PG 동일 115 라인) → SELECT-only SQL runner, 첫 POST 액션 화면 + 첫 동적 컬럼 화면.
+  - **백엔드** (`screen/script/` — 8 파일): `ScriptValidator`(주석 strip + ';' 분할 prefix 검사 + schema [A-Za-z0-9_]+ sanitize, 원본 _validate_select_only + _strip_sql_comments 동등) + `ScriptExecutor`(인터페이스 + inner Result/ColumnInfo) + `JdbcScriptExecutor`(Oracle: NLS_DATE_FORMAT → SET TRANSACTION READ ONLY → execute → rollback; PG: SET statement_timeout '30s' → SET search_path → SET TRANSACTION READ ONLY → _split_pg_stmts 분리 → 마지막 ResultSet → rollback; fetchmany(max+1) 동등으로 truncated 판정) + `ScriptService`(검증 → 실행 → 표준 ScreenResponse 조립, ColumnType 매핑 NUMBER/DATETIME/STRING 보강) + `ScriptController`(GET `/labs/api/script/schemas`, POST `/labs/api/script/run`, 검증/실행 오류는 200+ok=false 봉투 — 원본 동등) + `ScriptRunRequest/Result` + `ScriptSchemasResult`.
+  - **프런트**(5 파일 추가 / 2 파일 수정): `features/script/api/useScriptRun`(POST mutation) + `useScriptSchemas`(GET 60s cache) + `pages/screen/ScriptManagerPage`(SQL textarea + schema selector(PG 만) + Run 버튼 + truncated 배너 + 결과 ScreenTable, 디자인시스템 토큰 — `rounded-strong`/`bg-gray-00`/`text-body-3`/`font-mono`/`bg-sky-06 hover sky-07`/`border-rose-03 bg-rose-01`/`border-amber-04 bg-amber-01`) + `routes/script_manager.tsx`(파일 라우터 `/script_manager`) + `mocks/fixtures/script.ts`(schemas 빈 + demo NUM/USR + 차단 fixture). `__root.tsx` 사이드바 **Tools** 그룹 + Script Manager 메뉴 추가. `handlers.ts` script POST/GET 등록(차단 prefix 동적 응답).
+  - **검증**:
+    - BE clean test **70 PASS** (47 + 신규 23: ScriptValidatorTest 13 + ScriptServiceTest 10), build SUCCESS.
+    - 라이브 BE 검증: 로그인 OK / **DROP 차단 라이브 PASS**(`"Only SELECT is allowed. Blocked statement starts with: DROP"` 원본 동일 문구) / **/labs/api/script/schemas 라이브 PASS**(ORACLE 환경 빈 리스트). SELECT 실행 라이브는 **Oracle 인스턴스 다운(ORA-01034)** 으로 미검증 — 다른 화면들도 동일 영향, 우리 코드 영향 없음. 환경 복구 시점에 재검증.
+    - 임시 hash(test1!) 패턴 사용 후 application.yml 원복 + BE 재기동 완료(test1! 로그인 거부 확인).
+    - FE test **18 PASS** (15 + ScriptManagerPage 3: 초기 안내 / SELECT 실행 표 렌더 / 차단 응답 오류 노출), build 1484 modules **582KB**/176KBgz, lint 0 errors.
+  - **신규 패턴 확립**: ① POST 액션 화면 골격 + 표준 봉투 일관성 ② 동적 컬럼 화면(ScreenResponse.builder 의 동적 column/row API 활용) ③ READ ONLY 트랜잭션 2중 방어 ④ 오류 200+ok=false 통일.
+
 ## 진행 누계
-- **포팅 완료 화면: 12 / 24** (overview + Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
-- **남은 화면 (12)**: history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
+- **포팅 완료 화면: 13 / 24** (overview + Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age + **script_manager**)
+- **남은 화면 (11)**: history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · char_setting · license_check · disk(vacuum_log) · partition 관리
 
 ## 다음 첫 액션
-1. **복잡 화면 포팅** — history(1294 라인, INSP_*_HISTORY 테이블 + 다중 view) · report(475 라인, Daily Report 카드) · alarm_history(566 라인, 로그파일+zip 파싱)
-2. **액션 페이지** — control_process(574) / script_manager(115, SELECT-only SQL runner) / config_page(800) / config_dump(886). POST 액션 + 권한 분기 포함
-3. **기타** — alert_svc_config(373) · license_check(407) · disk(vacuum_log) · partition 관리
-4. **기능 보강** — license DGS PORT 동적 컬럼 / alert 시계열 차트 / PG 전용 사이드바 조건부 / auth.py 경로B(DGServer.jar 복호화)
-5. **FE Storybook + Playwright** — 1 시나리오 시드
+1. **A 표 2번 alert_svc_config(373)** 또는 **3번 license_check(407)** — 폼 + 검증 + 저장 패턴 확립(POST 액션 두 번째 사례)
+2. **A 표 4번 report(475)** · **5번 alarm_history(566)** — Daily Report 카드 + 로그/zip 파싱
+3. **A 표 6번 control_process(574)** · **7~8번 config_page/dump(800/886)** — POST 액션 본격
+4. **A 표 9번 history(1294)** — 대규모 view + 차트
+5. **기능 보강** — license DGS PORT 동적 컬럼 / alert 시계열 차트 / PG 사이드바 / auth.py 경로B
+6. **FE Storybook + Playwright** — 1 시나리오 시드
 
 ## 미해결 결정
 - 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)
@@ -199,11 +212,11 @@
 ## 차단 요인
 - **(2026-06-02 해소) EXEM UI 디자인시스템 미수령** — `gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 Phase 1~3 적용으로 해소.
 - 라이브 저장소 검증은 차단 요인 아님(해소).
+- **(2026-06-02 신규) Oracle 인스턴스 다운(ORA-01034)** — mxg2604@10.10.45.136:1521/ORACLE19 listener 다운. script_manager SELECT 실행 라이브 검증 미수행. 다른 화면도 동일 영향. 환경 복구 시 일괄 재검증 필요(BE 코드 영향 없음).
 - 잔여: `@exem-fe/react-table` 공개 npm 미공개 — 서브모듈+link 필요(테이블 화면 마이그 시점에 검토).
 
 ## 재개 후 첫 액션 체크리스트
-1. (Phase 4+) `ScreenTable / InstanceFilter / GroupChips` 디자인시스템 토큰화 — 기존 11 화면 시각 정렬.
-2. 페이지 헤더 토큰화 (SimpleScreenPage 등) — text-header-2 / text-body-3.
-3. (선택) `@exem-fe/react-table` 서브모듈 + link 도입 검토 — 대용량 화면 가상화 필요 시.
-4. overview 잔여 카드(Services + Disk/Tablespace) 포팅 — BE `screen/overview/` 에 `ServicesService` + `TablespaceService` 추가, FE 카드 컴포넌트 추가.
-5. history / report / alarm_history 복잡 화면 포팅.
+1. Oracle 인스턴스 가용성 확인(`TCP localhost:1521`) → 다운 시 DBA 에 startup 요청.
+2. A 표 2번 alert_svc_config(373) 또는 3번 license_check(407) 포팅 — 폼 + 검증 + 저장(POST 액션 두 번째 사례).
+3. (선택) `@exem-fe/react-table` 서브모듈 + link 도입 검토 — 대용량 화면(history) 가상화 필요 시.
+4. history / report / alarm_history 복잡 화면 포팅.
