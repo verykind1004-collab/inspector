@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  원본 _db_page 패턴 단순 점검 화면 SQL. 정식 2604 라인 sql_library.py 충실 포팅.
+  Oracle/PG 분기는 databaseId. PG 미지원 화면(temp_table 의 일부, query 등)도 함수 호출로 양쪽 제공.
+  허용 변경: SQL*Plus 지시어(SET/COLUMN) / psql 메타(\pset) 제거, 끝 세미콜론 제거.
+-->
+<mapper namespace="com.exem.inspector.screen.simple.SimpleScreenMapper">
+
+    <!-- ── capacity (Oracle) — _SQL_CAPACITY ───────────────────────────── -->
+    <select id="findCapacity" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        WITH f AS (
+          SELECT a.tablespace_name, ROUND(SUM(a.bytes)/1073741824,2) AS free
+            FROM dba_free_space a JOIN dba_users b ON a.tablespace_name=b.default_tablespace
+           WHERE b.username=USER GROUP BY a.tablespace_name),
+        t AS (
+          SELECT ROUND(SUM(a.bytes)/1073741824,2) AS total
+            FROM dba_data_files a JOIN dba_users b ON a.tablespace_name=b.default_tablespace
+           WHERE b.username=USER)
+        SELECT f.tablespace_name,
+               (t.total-f.free)||' GB' AS "Used",
+               t.total||' GB' AS "Total",
+               ROUND(((t.total-f.free)/t.total)*100,2)||'%' AS "PERCENT"
+          FROM f, t
+    </select>
+
+    <!-- ── capacity (PG) — _SQL_PG_CAPACITY ────────────────────────────── -->
+    <select id="findCapacity" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        WITH RawSizes AS (
+            SELECT
+                n.nspname AS schema_name,
+                pg_total_relation_size(c.oid) AS bytes
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('r','t','m')
+              AND n.nspname NOT IN ('pg_catalog','public','pg_toast','information_schema')
+        )
+        SELECT
+            schema_name,
+            round(SUM(bytes) / 1024.0 / 1024.0 / 1024.0, 2) || ' GB' AS size_gb
+        FROM RawSizes
+        GROUP BY schema_name
+        ORDER BY SUM(bytes) DESC
+    </select>
+
+    <!-- ── license (Oracle) — _SQL_LICENSE ─────────────────────────────── -->
+    <select id="findLicense" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        SELECT db_id, instance_name, sid,
+               rts_version,
+               host_ip, os_type, port AS "RTS PORT", lsnr_port
+          FROM apm_db_info
+         ORDER BY db_id
+    </select>
+
+    <!-- ── license (PG) — _SQL_PG_LICENSE ──────────────────────────────── -->
+    <select id="findLicense" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT db_id, instance_name, sid,
+               rts_version,
+               host_ip, os_type, port AS "RTS PORT", lsnr_port
+        FROM apm_db_info
+        ORDER BY db_id
+    </select>
+
+    <!-- ── alert (Oracle) — _SQL_ALERT ─────────────────────────────────── -->
+    <select id="findAlert" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        SELECT
+            a.db_id AS "DB ID",
+            a.instance_name AS "INSTANCE NAME",
+            h.name AS "ALARM NAME",
+            COUNT(h.name) AS "COUNT"
+        FROM apm_db_info a
+        JOIN ora_alarm_history h ON h.db_id = a.db_id
+        WHERE h.time &gt; SYSDATE - 30
+          AND h.name IN ('RTS Daemon Disconnect', 'RTS Server Down', 'DB Down', 'Listener Stop')
+        GROUP BY a.db_id, a.instance_name, h.name
+        ORDER BY a.instance_name ASC, "COUNT" DESC
+    </select>
+
+    <!-- ── alert (PG) — _SQL_PG_ALERT ──────────────────────────────────── -->
+    <select id="findAlert" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT * FROM insp_alarm_history_check() ORDER BY 1
+    </select>
+
+    <!-- ── query (Oracle) — _SQL_ORACLE_QUERY ──────────────────────────── -->
+    <select id="findQuery" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        WITH base AS (
+          SELECT a.db_id, a.instance_name,
+                 TO_NUMBER(TO_CHAR(TRUNC(SYSDATE-1),'YYMMDD') || LPAD(a.db_id,3,'0')) AS part_key
+            FROM apm_db_info a)
+        SELECT b.db_id AS "DB ID",
+               b.instance_name,
+               CASE WHEN NVL(lc.download_sql_plan,'N') != 'Y' THEN 'OFF'
+                    WHEN EXISTS(SELECT 1 FROM ora_sql_plan p
+                                 WHERE p.db_id=b.db_id AND p.partition_key=b.part_key)
+                    THEN 'OK' ELSE 'CHECK' END AS plan_status,
+               CASE WHEN NVL(lc.download_sql_bind,'N') != 'Y' THEN 'OFF'
+                    WHEN EXISTS(SELECT 1 FROM ora_bind_value bv
+                                 WHERE bv.db_id=b.db_id AND bv.partition_key=b.part_key)
+                    THEN 'OK' ELSE 'CHECK' END AS bind_status,
+               CASE WHEN NVL(lc.download_tablespace,'N') != 'Y' THEN 'OFF'
+                    WHEN EXISTS(SELECT 1 FROM ora_tablespace_info tbs
+                                 WHERE tbs.db_id=b.db_id AND tbs.partition_key=b.part_key)
+                    THEN 'OK' ELSE 'CHECK' END AS tablespace_status,
+               CASE WHEN NVL(lc.download_parameter,'N') != 'Y' THEN 'OFF'
+                    WHEN EXISTS(SELECT 1 FROM ora_db_parameter prm
+                                 WHERE prm.db_id=b.db_id AND prm.partition_key=b.part_key)
+                    THEN 'OK' ELSE 'CHECK' END AS parameter_status
+          FROM base b
+          LEFT JOIN ora_lc_config lc ON lc.db_id = b.db_id
+          ORDER BY b.instance_name
+    </select>
+
+    <!-- ── query (PG) — _SQL_PG_QUERY ──────────────────────────────────── -->
+    <select id="findQuery" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT * FROM insp_query_check()
+    </select>
+
+    <!-- ── top_segment (Oracle) — _SQL_TOP_SEGMENT ─────────────────────── -->
+    <select id="findTopSegment" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        SELECT * FROM (
+            SELECT
+                USER AS SCHEMA_NAME,
+                t.segment_name AS TABLE_NAME,
+                CASE
+                    WHEN (t.bytes + NVL(i.idx_bytes, 0)) &gt;= 1073741824 THEN ROUND((t.bytes + NVL(i.idx_bytes, 0))/1073741824, 2) || ' GB'
+                    WHEN (t.bytes + NVL(i.idx_bytes, 0)) &gt;= 1048576 THEN ROUND((t.bytes + NVL(i.idx_bytes, 0))/1048576, 2) || ' MB'
+                    ELSE ROUND((t.bytes + NVL(i.idx_bytes, 0))/1024, 2) || ' KB'
+                END AS TOTAL_SIZE,
+                CASE
+                    WHEN t.bytes &gt;= 1073741824 THEN ROUND(t.bytes/1073741824, 2) || ' GB'
+                    WHEN t.bytes &gt;= 1048576 THEN ROUND(t.bytes/1048576, 2) || ' MB'
+                    ELSE ROUND(t.bytes/1024, 2) || ' KB'
+                END AS TABLE_SIZE,
+                CASE
+                    WHEN NVL(i.idx_bytes, 0) &gt;= 1073741824 THEN ROUND(NVL(i.idx_bytes, 0)/1073741824, 2) || ' GB'
+                    WHEN NVL(i.idx_bytes, 0) &gt;= 1048576 THEN ROUND(NVL(i.idx_bytes, 0)/1048576, 2) || ' MB'
+                    ELSE ROUND(NVL(i.idx_bytes, 0)/1024, 2) || ' KB'
+                END AS INDEX_SIZE
+            FROM
+                (SELECT segment_name, bytes FROM user_segments WHERE segment_type = 'TABLE') t
+            LEFT JOIN
+                (SELECT i.table_name, SUM(s.bytes) AS idx_bytes
+                 FROM user_indexes i
+                 JOIN user_segments s ON i.index_name = s.segment_name
+                 GROUP BY i.table_name) i ON t.segment_name = i.table_name
+            ORDER BY (t.bytes + NVL(i.idx_bytes, 0)) DESC
+        ) WHERE ROWNUM &lt;= 30
+    </select>
+
+    <!-- ── top_segment (PG) — _SQL_PG_TOP_SEGMENT ──────────────────────── -->
+    <select id="findTopSegment" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT n.nspname AS schema_name,
+               c.relname AS table_name,
+               pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size,
+               pg_size_pretty(pg_relation_size(c.oid)) AS table_size,
+               pg_size_pretty(pg_indexes_size(c.oid)) AS index_size
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+        ORDER BY c.relpages DESC
+        LIMIT 30
+    </select>
+
+    <!-- ── temp_table (Oracle) — _SQL_ORACLE_TEMP_TABLE ────────────────── -->
+    <select id="findTempTable" resultType="java.util.LinkedHashMap" databaseId="oracle">
+        SELECT USER AS "SCHEMA", table_name AS "TEMP TABLE"
+        FROM user_tables
+        WHERE UPPER(table_name) LIKE 'TT%'
+        ORDER BY table_name
+    </select>
+
+    <!-- ── temp_table (PG) — _SQL_PG_TEMP_TABLE ────────────────────────── -->
+    <select id="findTempTable" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT schemaname AS "SCHEMA", tablename AS "TEMP TABLE"
+        FROM pg_tables
+        WHERE tablename LIKE 'tt%'
+        ORDER BY 1
+    </select>
+
+    <!-- ── vacuum (PG 전용) — _SQL_PG_VACUUM_CHECK ──────────────────────── -->
+    <select id="findVacuum" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        WITH threshold_calc AS (
+          SELECT schemaname, relname, n_live_tup, n_dead_tup, autovacuum_count, last_autovacuum,
+                 (current_setting('autovacuum_vacuum_threshold')::int
+                  + current_setting('autovacuum_vacuum_scale_factor')::numeric * n_live_tup) AS vacuum_threshold
+          FROM pg_stat_user_tables
+        ),
+        exceed AS (
+          SELECT * FROM threshold_calc WHERE n_dead_tup &gt; vacuum_threshold
+        ),
+        not_vacuumed AS (
+          SELECT * FROM exceed WHERE last_autovacuum IS NULL OR last_autovacuum &lt; now() - interval '3 days'
+        )
+        SELECT schemaname AS schema, relname AS table_name, n_dead_tup AS dead_tuples,
+               round(vacuum_threshold) AS vacuum_threshold, last_autovacuum
+        FROM not_vacuumed
+        ORDER BY (n_dead_tup - vacuum_threshold) DESC
+    </select>
+
+    <!-- ── age (PG 전용) — _SQL_PG_AGE ──────────────────────────────────── -->
+    <select id="findAge" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+        SELECT datname AS dbname,
+               (SELECT to_char(setting::integer,'99,999,999,999') FROM pg_settings WHERE name='autovacuum_freeze_max_age') AS parameter_max_age,
+               to_char(age(datfrozenxid),'9,999,999,999') AS max_age,
+               to_char(txid_current(),'99,999,999,999') AS current_txid
+        FROM pg_database
+        WHERE datname = current_database()
+        ORDER BY age(datfrozenxid) DESC
+    </select>
+
+</mapper>

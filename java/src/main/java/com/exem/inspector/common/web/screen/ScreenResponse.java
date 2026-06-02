@@ -64,6 +64,21 @@ public class ScreenResponse {
             return this;
         }
 
+        /**
+         * 매퍼가 반환한 LinkedHashMap(컬럼 라벨 키) 한 행을 컬럼 메타 키 순서대로 추가한다.
+         * 원본 _parse_db_table 의 헤더->값 매핑과 동등(컬럼 메타에 정의된 키만 노출).
+         */
+        public Builder rowFromMap(Map<String, ?> source) {
+            if (source == null) {
+                throw new IllegalArgumentException("rowFromMap source 가 null");
+            }
+            Object[] values = new Object[columns.size()];
+            for (int i = 0; i < columns.size(); i++) {
+                values[i] = source.get(columns.get(i).getKey());
+            }
+            return row(values);
+        }
+
         /** 컬럼 정의 순서대로 값을 받아 행을 추가한다(values 길이 = 컬럼 수). */
         public Builder row(Object... values) {
             if (values.length != columns.size()) {

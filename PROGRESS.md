@@ -10,7 +10,7 @@
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
 ## 현재 작업
-Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 완료 → Phase B 2차(Storybook + Playwright + 나머지 22 화면 단계 포팅).
+단순 점검 8 화면 일괄 포팅 완료(누계 11/24). 다음 = 복잡 화면(overview/history/report 등) + 액션 페이지 단계 포팅.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -51,7 +51,7 @@ Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 완료 →
   - **SummaryMapper.xml 재정정**: 정식 2604 라인 본문(md5 `b9c31c07`·`74757197`·`1baa19c1`·`cc8b50a7`)으로 4개 select 재포팅. **핵심 차이 = ORDER BY**(정식은 상태 우선순위 CHECK→WAITING→OK + 보조키, Labs 변형은 summary_time NULLS FIRST + db_id). 운영상 정식이 더 합리적. resultMap 그대로.
   - 컬럼 alias·CASE 본문 등 나머지는 동일.
 
-- **Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 (2026-06-02, 미커밋)**:
+- **Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 (2026-06-02, ba7dc5d push)**:
   - **실 저장소 라이브 검증 완료 (mxg2604@10.10.45.136:1521/ORACLE19)**:
     - `java/config/service_config.json` 작성(ORACLE/2604 의 repository 블록 복사, .gitignore 처리)
     - `spring-boot:run` 기동 OK. DataSource 구성 로그 확인 — `리포지토리 DataSource 구성: ORACLE jdbc:oracle:thin:@//10.10.45.136:1521/ORACLE19`
@@ -66,12 +66,27 @@ Phase B 1차 + 실 저장소 라이브 검증 + Session 화면 포팅 완료 →
     - 구성: SessionMapper(@Mapper databaseId Oracle/PG) + XML + resultMap + SessionRow + SessionService(ObjectProvider 선택주입) + SessionController(GET `/labs/api/session`) + SessionServiceTest(3 tests)
   - **검증: clean test 22 PASS** (기존 19 + Session 3)
 
-## 다음 첫 액션 (Phase B 2차)
-1. 프론트 Storybook init + stories(Button/StatusBadge/GroupChips/InstanceFilter/ScreenTable)
-2. 프론트 Playwright config + Summary 1 시나리오(로딩→인스턴스 필터→정렬)
-3. 나머지 22 원본 화면 단계 포팅(원본 인벤토리: capacity/license/alert/query/top_segment/temp_table/vacuum/age/overview/history/report/alarm_history/alert_svc_config/config_page/config_dump/control_process/script_manager/char_setting 등)
-4. 병행: auth.py 경로B(DB 사용자 인증) — DGServer.jar 복호화 분석
-5. EXEM `@exem-fe/*` 레지스트리 확보 시점 shared/ui adapter 교체
+- **Phase B 3차 — 단순 점검 8 화면 일괄 포팅 (2026-06-02, 미커밋)**:
+  - 대상: **capacity / license / alert / query / top_segment / temp_table / vacuum(PG) / age(PG)**. 원본 `_db_page` 패턴(SQL 한 개 → 표 렌더링).
+  - **백엔드 일반화**: `SimpleScreenMapper`(8 메소드, `LinkedHashMap<String,Object>` 반환 — 원본 `_parse_db_table` 헤더-값 매핑과 동등) + XML(8 select × Oracle/PG databaseId, 단 vacuum/age 는 PG 전용). `SimpleScreenService` 가 화면 spec(컬럼 메타 + dbType 분기 + 매퍼 호출) 보유. `SimpleScreenController` 단일 — `GET /labs/api/{key:capacity|license|alert|query|top_segment|temp_table|vacuum|age}` 화이트리스트. 미지원 키 404, 미지원 dbType 은 error 봉투.
+  - `ScreenResponse.Builder.rowFromMap()` 추가 — 컬럼 메타 키 순서대로 LinkedHashMap 행 매핑.
+  - 컬럼 메타 화면 고정. PG 함수 호출(insp_alarm_history_check / insp_query_check) 결과 컬럼은 Oracle 메타와 동일 가정(원본 함수 정의가 그렇게 작성됨).
+  - **프론트 일반화**: `features/screen/`(useScreen hook + ScreenView) + `pages/screen/SimpleScreenPage`(props: screenKey/title/sub) + 라우트 8개(`/capacity`, `/license`, `/alert`, `/query`, `/top_segment`, `/temp_table`, `/vacuum`, `/age`) + `__root.tsx` 사이드바 그룹 4개(Inventory/Health/PostgreSQL) 추가. MSW fixtures 8개(simple.ts 일괄), handlers 자동 등록.
+  - SQL 본문은 정식 2604 그대로(SQL*Plus `SET/COLUMN`, psql `\pset` 만 제거). 컬럼 alias 보존(`"DB ID"`, `"INSTANCE NAME"`, `"ALARM NAME"`, `"COUNT"`, `"RTS PORT"`, `"SCHEMA"`, `"TEMP TABLE"` 등).
+  - **검증: mvnw test 29 PASS** (22 + SimpleScreen 7), 프론트 build 461 modules 370KB/118KBgz · test 12 PASS · lint 0 errors.
+
+## 진행 누계
+- 포팅 완료 화면: **11 / 24** (Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age)
+- 남은 화면: overview · history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · script_manager · char_setting · license_check · disk(vacuum_log) · partition 관리
+
+## 다음 첫 액션 (Phase B 4차)
+1. 복잡 화면(overview / history / report / alarm_history)부터 단계 포팅 — 다중 SQL/시스템 정보/카드 패턴
+2. 액션 페이지(control_process / script_manager / config_page / config_dump) — POST 액션 포함
+3. license 의 DGS PORT 동적 컬럼 추가(원본 _get_dgs_port_map 로직 — DGServer.xml + log grep)
+4. alert 의 시계열 차트(api_alert_times — 인스턴스/알람별 30일 일별 카운트)
+5. PG 전용 화면 사이드바 조건부 표시(현 dbType 인식)
+6. 프론트 Storybook + Playwright(Summary 1 시나리오)
+7. 병행: auth.py 경로B(DGServer.jar)
 
 ## 미해결 결정
 - 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임은 대용량 화면(query·history 등) 포팅 시 필요 시 도입(현 시점 1:1 원칙상 원본 미지원이면 미도입)
