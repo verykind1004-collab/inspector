@@ -9,18 +9,85 @@
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
-## 현재 작업 (2026-06-02 — overview 화면 100% 완성, 디자인시스템 Phase 1~4 적용 완료)
-**overview 화면 5/5 카드 완성**: System + CPU + Memory + Disk/Tablespace + Services. 누계 12/24 (overview 1 + 기존 11).
+## 현재 작업 (2026-06-02 — 세션 종료 시점 — 다음 세션에서 일괄 재개)
 
-**EXEM 디자인시스템 적용 (FE) Phase 1~4 완료** (`gitlab.exem.xyz/fe1/design-studio-temp` 클론 후 maxgauge-vi 패턴 미러):
-- Phase 1: `@exem-ui/{core,react,tailwindcss4}` npm 설치 + Pretendard 4 woff2 + `src/index.css` 진입 정렬
-- Phase 2: overview 컴포넌트(VitalBadge=Tag, VitalBar=Progress, SystemCard/VitalsCards/OverviewView 토큰화)
-- Phase 3: StatusBadge=Tag (기존 11 화면 영향), `__root.tsx` 사이드바 토큰화
-- Phase 4: ScreenTable / InstanceFilter / GroupChips / 페이지 헤더(SimpleScreenPage / Summary{10Min,1Hour} / SessionPage) 토큰화
+**완료 누계**:
+- 화면 포팅: **12 / 24** (overview 5 카드 + 기존 11: Summary 10Min/1Hour, Session, capacity, license, alert, query, top_segment, temp_table, vacuum, age)
+- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** (`@exem-ui/{core,react,tailwindcss4}` + Pretendard + 12 화면 시각 정렬)
+- 검증: BE clean test **47 PASS** / FE test **15 PASS** / build SUCCESS / lint 0 errors
 
-**검증** (각 Phase 별): BE `mvnw clean test` 47 PASS (37 + overview Services 5 + Disk 5) / FE `pnpm test` 15 PASS / `pnpm build` SUCCESS / `pnpm lint` 0 errors.
+**서버 git 상태 (재개 시 첫 확인)**:
+- BE `release/inspector` (origin push 완료, setup/foundation 브랜치): 최신 `ca0be54`
+- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 최신 `45c5349`
+  - FE 로컬 커밋 누적 (재시작 후 그대로 보존):
+    ```
+    45c5349 overview Services 카드 (FE)
+    4c929b0 overview Disk/Tablespace 카드 (FE)
+    0e63b82 디자인시스템 Phase 4 (ScreenTable·filters·page headers)
+    08469d5 디자인시스템 Phase 3 (StatusBadge + sidebar)
+    071823c 디자인시스템 Phase 2 (overview cards)
+    b3ac13f 디자인시스템 Phase 1 (packages + CSS + Pretendard)
+    d575972 overview UI System+Vitals (FE)
+    ae2d4a1 8 simple-check screens (Phase B 3차 FE)
+    ```
 
-**다음 = 신규 복잡/액션 화면 포팅**: history(1294 라인) · report(475) · alarm_history(566 라인, 로그파일+zip 파싱) · 액션 페이지 4종 · 기타 5종.
+**미완 작업 = 12 화면 + 기능보강 + 인프라** (세션 종료 시점에서 다음 세션이 일괄 진행할 항목):
+
+### A. 화면 포팅 (12 화면)
+| 우선 | 화면 | 원본 라인 | 복잡도 | 비고 |
+|---|---|---:|---|---|
+| 1 | **script_manager** | 115 | medium | SELECT-only SQL runner + 보안 prefix 검증 + POST |
+| 2 | **alert_svc_config** | 373 | medium | SMS/API/Mail 설정 |
+| 3 | **license_check** | 407 | medium | 라이선스 + 인스턴스 정보, DGS PORT 동적 컬럼 보강 별도 |
+| 4 | **report** | 475 | medium-high | Daily Report 카드(어제 OS/Mem/Disk 평균, INSP_OS_HISTORY 의존) |
+| 5 | **alarm_history** | 566 | high | 로그파일 + zip 아카이브 파싱, SMS/API/Mail 송신 이력 |
+| 6 | **control_process** | 574 | high | POST 액션(start/stop/restart) + 프로세스 제어 |
+| 7 | **config_page** | 800 | very high | 폼 렌더 + 저장 |
+| 8 | **config_dump** | 886 | very high | 전체 설정 덤프 |
+| 9 | **history** | 1294 | very high | INSP_*_HISTORY 테이블 + 다중 view + 차트 |
+| 10 | char_setting | (없음) | — | 원본 미존재 — 스킵 또는 정의 확정 후 |
+| 11 | disk(vacuum_log) | unknown | medium~high | 정확한 원본 파일 확인 필요 |
+| 12 | partition 관리 | unknown | medium~high | 정확한 원본 파일 확인 필요 |
+
+### B. 기능 보강 (4)
+- **license DGS PORT 동적 컬럼** — 원본 `_get_dgs_port_map` (DGServer.xml + log grep) Java 이식, 기존 license 화면 강화
+- **alert 시계열 차트** — `api_alert_times` (인스턴스/알람별 30일 일별 카운트), echarts 도입
+- **PG 전용 사이드바 조건부 표시** — 현 dbType 감지해서 vacuum/age 메뉴 토글
+- **auth.py 경로B** — DB 사용자 인증(apm_user_list + DGServer.jar 복호화). **jar 분석 선행 필요**(이식 난도 높음, 보안개선 후보로 BCrypt 등 별도 트랙 검토 가치)
+
+### C. 인프라
+- **FE Storybook + Playwright** — Summary 1 시나리오 시드. 디자인시스템 컴포넌트 스토리북 추가.
+- **FE remote 레포 생성** — 현 폴리레포 로컬 보존 8 commit. GitLab 또는 GitHub 레포 생성 후 origin 등록 + push.
+- **번들 split** — 현 JS 573KB (>500KB 경고). `manualChunks` 로 EXEM/Tanstack/React vendor 분리.
+
+### D. 미해결 결정
+- 표준 JSON 스키마 확장 — 정렬/페이징/필터 서버위임 (대용량 화면 query/history 등 포팅 시 도입)
+- INSP_* 테이블 DDL · MXG_* DB 함수 — 화면 포팅 시점 케이스별 확보
+- 오픈소스/라이선스 검증 기준 — 백엔드 개발팀 확인 필요(고객사 외부 인터넷 차단)
+
+## 세션 종료 시점 가동 상태 (2026-06-02 18:02~ 기동)
+- BE Spring Boot 2.7.18 / JDK 8 — `:8083` 가동 중 (`/tmp/inspector-be.log`, PID 4676)
+- FE Vite dev — `:5173` 가동 중 (`/tmp/inspector-fe.log`, PID 6150)
+- 접속: SSH 터널 `ssh -L 15173:localhost:5173 -p 22022 inspector@10.10.45.136` → `http://localhost:15173/`
+- 정지: `pkill -f "spring-boot:run"; pkill -f vite`
+
+## 재개 후 첫 액션 (다음 세션이 자율 진행)
+
+```
+세션 시작 → PROGRESS.md (정본 ca0be54) Read → A 표 우선순위 1번부터 순차
+  1. script_manager (가장 작음, BE+FE 풀스택, 보안 검증 패턴 확립)
+  2. alert_svc_config
+  3. license_check + 기능 B-1(DGS PORT 동적 컬럼)
+  4. report  
+  5. alarm_history (로그+zip 파싱)
+  6. control_process (POST 액션 패턴 확립)
+  7. config_page / config_dump (대규모 폼)
+  8. history (대규모 view + 차트)
+  9. C 인프라 (Storybook + FE remote + 번들 split)
+  10. D 미해결 결정 사용자 확인
+```
+
+각 화면 1:1 동등 포팅, 디자인시스템(@exem-ui) 컴포넌트 우선, 검증 = clean test + build + lint.
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
