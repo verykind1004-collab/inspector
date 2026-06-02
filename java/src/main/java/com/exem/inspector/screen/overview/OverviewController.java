@@ -11,9 +11,8 @@ import com.exem.inspector.common.web.ApiResponse;
 /**
  * Overview 화면 API.
  *
- * <p>원본 {@code pages/overview.py::page_overview / api_vitals / api_services /
- * api_tablespace} 와 대응. 본 단계는 system + vitals 만 제공 (services / disk·tablespace
- * 는 후속 단계에서 추가).
+ * <p>원본 {@code pages/overview.py::page_overview / api_vitals / api_tablespace}
+ * 와 대응. Services 카드는 후속 단계.
  *
  * <p>모든 응답은 표준 봉투(ApiResponse) 로 감싸 일관 처리한다.
  */
@@ -22,9 +21,11 @@ import com.exem.inspector.common.web.ApiResponse;
 public class OverviewController {
 
     private final OverviewService service;
+    private final OverviewDiskService diskService;
 
-    public OverviewController(OverviewService service) {
+    public OverviewController(OverviewService service, OverviewDiskService diskService) {
         this.service = service;
+        this.diskService = diskService;
     }
 
     /** System 카드 — Hostname/OS/Uptime/Cores. 정적 정보로 폴링 불필요. */
@@ -37,5 +38,19 @@ public class OverviewController {
     @GetMapping("/vitals")
     public ApiResponse<Map<String, Object>> vitals() {
         return ApiResponse.ok(service.vitals());
+    }
+
+    /**
+     * Disk/Tablespace 카드.
+     * Oracle 이면 default tablespace 목록, PG 면 pg_data_dir 의 OS 디스크 stat.
+     * 원본 api_tablespace + _disk_for_overview 등가(분기 통합).
+     */
+    @GetMapping("/disk")
+    public ApiResponse<Map<String, Object>> disk() {
+        try {
+            return ApiResponse.ok(diskService.disk());
+        } catch (IllegalStateException e) {
+            return ApiResponse.error(e.getMessage());
+        }
     }
 }

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  Overview Disk/Tablespace 매퍼.
+  Oracle 전용 — PG 빌드에선 빈 select 만 정의해 매퍼 호출이 안전하게 빈 결과를 돌려준다.
+  원본: _SQL_ORACLE_TABLESPACE_OVERVIEW (정식 2604 라인 sql_library.py).
+-->
+<mapper namespace="com.exem.inspector.screen.overview.OverviewDiskMapper">
+
+    <resultMap id="TablespaceRowMap" type="com.exem.inspector.screen.overview.TablespaceRow">
+        <result property="name"    column="TABLESPACE_NAME"/>
+        <result property="usedGb"  column="USED_GB"/>
+        <result property="totalGb" column="TOTAL_GB"/>
+        <result property="freeGb"  column="FREE_GB"/>
+        <result property="percent" column="PCT"/>
+    </resultMap>
+
+    <select id="findOracleTablespaces" databaseId="oracle" resultMap="TablespaceRowMap">
+        WITH f AS (
+          SELECT a.tablespace_name, ROUND(SUM(a.bytes)/1073741824,2) AS free_gb
+            FROM dba_free_space a JOIN dba_users b ON a.tablespace_name=b.default_tablespace
+           WHERE b.username=USER GROUP BY a.tablespace_name),
+        t AS (
+          SELECT ROUND(SUM(a.bytes)/1073741824,2) AS total_gb
+            FROM dba_data_files a JOIN dba_users b ON a.tablespace_name=b.default_tablespace
+           WHERE b.username=USER)
+        SELECT TRIM(f.tablespace_name) AS tablespace_name,
+               ROUND(t.total_gb-f.free_gb,2) AS used_gb,
+               t.total_gb,
+               f.free_gb,
+               ROUND(((t.total_gb-f.free_gb)/t.total_gb)*100,2) AS pct
+          FROM f, t
+    </select>
+
+    <!-- PG 환경에선 호출자가 Files.getFileStore 로 직접 처리. 매퍼 호출 시 빈 결과. -->
+    <select id="findOracleTablespaces" databaseId="postgresql" resultMap="TablespaceRowMap">
+        SELECT NULL AS TABLESPACE_NAME, NULL AS USED_GB, NULL AS TOTAL_GB,
+               NULL AS FREE_GB, NULL AS PCT
+         WHERE FALSE
+    </select>
+
+</mapper>

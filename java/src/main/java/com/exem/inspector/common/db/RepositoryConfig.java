@@ -7,7 +7,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * service_config.json 의 repository 블록 매핑.
  *
  * <p>리포지토리(MaxGauge 저장소) DB 접속정보. sid 는 Oracle 에선 service_name,
- * PG 에선 dbname 으로 쓰인다(db_utils.py 사양). pg_home/pg_data_dir 등 접속과 무관한 키는 무시한다.
+ * PG 에선 dbname 으로 쓰인다(db_utils.py 사양).
+ * pg_data_dir 은 overview Disk 카드 표시용 — 접속 자체에는 사용하지 않는다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RepositoryConfig {
@@ -29,6 +30,10 @@ public class RepositoryConfig {
 
     @JsonProperty("sid")
     private String sid = "";
+
+    /** PG 운영 시 데이터 디렉토리 — overview Disk 카드 산정 기준 경로(원본 _disk_for_overview 와 동등). */
+    @JsonProperty("pg_data_dir")
+    private String pgDataDir = "";
 
     public String dbType() {
         return dbType;
@@ -56,6 +61,10 @@ public class RepositoryConfig {
 
     public String sid() {
         return sid;
+    }
+
+    public String pgDataDir() {
+        return pgDataDir == null ? "" : pgDataDir.trim();
     }
 
     /**
