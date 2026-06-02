@@ -12,16 +12,17 @@
 ## 현재 작업 (2026-06-02 — 세션 종료 시점 — 다음 세션에서 일괄 재개)
 
 **완료 누계**:
-- 화면 포팅: **13 / 24** (overview 5 카드 + 기존 11: Summary 10Min/1Hour, Session, capacity, license, alert, query, top_segment, temp_table, vacuum, age + **script_manager**)
-- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** (`@exem-ui/{core,react,tailwindcss4}` + Pretendard + 12 화면 시각 정렬 — script_manager 도 동일 토큰)
-- 검증: BE clean test **70 PASS** / FE test **18 PASS** / build SUCCESS / lint 0 errors
+- 화면 포팅: **14 / 24** (overview 5 카드 + 기존 11 + script_manager + **alert_svc_config** 3종 라우트)
+- 디자인시스템: **EXEM Design System Phase 1~4 적용 완료** + alert_svc_config 도 동일 토큰
+- 검증: BE clean test **86 PASS** / FE test **21 PASS** / build SUCCESS / lint 0 errors
 
 **서버 git 상태 (재개 시 첫 확인)**:
-- BE `release/inspector` (origin push 완료까지는 `ca0be54` / **본 세션 신규 HEAD 1 commit 은 origin 미push**, setup/foundation 브랜치 — 정확한 hash 는 재개 시 `git log -3 --oneline` 으로 확인)
-- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 최신 `8d6eb02`
-  - FE 로컬 커밋 누적 (재시작 후 그대로 보존, 9개):
+- BE `release/inspector` (origin push 완료까지는 `ca0be54` / **본 세션 신규 2 commit 은 origin 미push**, setup/foundation 브랜치 — 정확한 hash 는 재개 시 `git log -3 --oneline` 으로 확인)
+- FE `release/inspector-web` (origin 미등록, **local commit 보존**): 본 세션 신규 alert_svc_config FE
+  - FE 로컬 커밋 누적 (10개):
     ```
-    8d6eb02 Script Manager page (FE) — 본 세션 신규
+    98d4889 Alert Service Config page (FE) — 본 세션 신규
+    8d6eb02 Script Manager page (FE)
     45c5349 overview Services 카드 (FE)
     4c929b0 overview Disk/Tablespace 카드 (FE)
     0e63b82 디자인시스템 Phase 4 (ScreenTable·filters·page headers)
@@ -34,11 +35,11 @@
 
 **미완 작업 = 12 화면 + 기능보강 + 인프라** (세션 종료 시점에서 다음 세션이 일괄 진행할 항목):
 
-### A. 화면 포팅 (11 화면 — script_manager 완료)
+### A. 화면 포팅 (10 화면 — script_manager + alert_svc_config 완료)
 | 우선 | 화면 | 원본 라인 | 복잡도 | 비고 |
 |---|---|---:|---|---|
-| ~~1~~ | ~~script_manager~~ | ~~115~~ | ~~medium~~ | ~~SELECT-only SQL runner~~ — **완료(Phase B 5차)** |
-| 2 | **alert_svc_config** | 373 | medium | SMS/API/Mail 설정 |
+| ~~1~~ | ~~script_manager~~ | ~~115~~ | ~~medium~~ | **완료(Phase B 5차)** |
+| ~~2~~ | ~~alert_svc_config~~ | ~~373/731~~ | ~~medium~~ | **완료(Phase B 6차)** — SMS/API/Mail 3 라우트 |
 | 3 | **license_check** | 407 | medium | 라이선스 + 인스턴스 정보, DGS PORT 동적 컬럼 보강 별도 |
 | 4 | **report** | 475 | medium-high | Daily Report 카드(어제 OS/Mem/Disk 평균, INSP_OS_HISTORY 의존) |
 | 5 | **alarm_history** | 566 | high | 로그파일 + zip 아카이브 파싱, SMS/API/Mail 송신 이력 |
@@ -181,6 +182,14 @@
   - 페이지 헤더 6개(SimpleScreenPage / Summary{10Min,1Hour} / SessionPage) — `text-header-2` + `text-body-3`
   - 검증: pnpm test 15 PASS / build SUCCESS / lint 0 errors.
 
+- **Phase B 6차 — alert_svc_config 화면 포팅 (2026-06-02, BE 182ea1f 미push / FE 98d4889 미push)**:
+  - 원본 `pages/alert_svc_config.py` (Oracle 373 / PG 731라인, 차이 = PG 만 `api_alert_svc_copy` 추가) 1:1 동등 포팅. 원본은 사이드바 메뉴 진입 모달 → **SPA 라우트 페이지로 평탄화**(1:1 동등 = 기능, UI 매체는 다름).
+  - **백엔드** (`screen/alertsvc/` — 10 main + 2 test): `AlertSvcKind`(enum 3종) + `AlertSvcXmlParser`(원본 `_parse_xml_simple` 정규식 동등 — 평면 태그 / 자기닫는 속성 / 다중라인 블록(SMS_INSERT_QUERY/DATA/CONTENT/SUBJECT, DOTALL) / `b\\d+` bind / `h\\d+` header / `<Node>` / `<sms_database_sid service="...">`) + `AlertSvcConfigService`(read/save/copy 일관 — `listDgServers()` 가 service_config.json 의 `services.dgserver_s` 배열 순회, 백업 파일명 `{path}.bak_{yyMMdd}_{seq}` 원본 알고리즘, activate=true→sample을 active로 복사 + `.jar`/`.unit` 같이 복사, activate=false→active 파일들(`.xml`/`.jar`/`.unit`) 삭제) + `AlertSvcConfigController`(GET `/labs/api/alert-svc/{kind:sms|api|mail}`, POST `/labs/api/alert-svc/save`, POST `/labs/api/alert-svc/copy`). DTO 7종.
+  - **프런트**(5 신규 + 2 수정): `features/alert-svc/api/use-alert-svc`(read query / save mutation / copy mutation) + `pages/alert-svc/AlertSvcConfigPage`(부모-자식 분리 — 부모는 DGServer select, 자식 `EditPanel` 은 `key={svcDir}` 으로 entry 변경 시 재마운트, React 공식 "Resetting state with a key" 패턴 → `useEffect setState` 캐스케이딩 회피 / 디자인시스템 토큰 rounded-strong / bg-gray-00 / font-mono / sky-06 active / rose 오류 / green 성공). `routes/alert-config.{sms,api,mail}.tsx` 3개 파일 라우터. `__root.tsx` 사이드바 **Service Config** 그룹(SMS/API/Mail) 추가. `mocks/fixtures/alert-svc.ts` + `handlers.ts`.
+  - **검증**: BE clean test **86 PASS** (70 + 신규 16: XmlParser 6 + Service 10, @TempDir 활용 실 파일시스템 검증) / FE test **21 PASS** (18 + AlertSvcConfigPage 3) / build SUCCESS (1499 modules, JS 589KB/178KBgz) / lint 0 errors.
+  - **라이브 미수행**: `java/config/service_config.json` 에 services.dgserver_s 미설정 → 환경 setup 후 라이브 read 검증 예정. 단위 테스트가 파일 시스템 케이스(active/inactive/activate-toggle/deactivate/copy multi/missing-dir)를 망라.
+  - **신규 패턴**: ① 파일 시스템 직접 조작 화면(JDBC 없이 java.nio.file 기반) ② 부모-자식 key 재마운트로 useEffect setState 회피(react-compiler 호환) ③ 동적 라우트 다중 진입점.
+
 - **Phase B 5차 — script_manager 화면 포팅 (2026-06-02, BE 미push / FE 미push)**:
   - 원본 `pages/script_manager.py` (Oracle/PG 동일 115 라인) → SELECT-only SQL runner, 첫 POST 액션 화면 + 첫 동적 컬럼 화면.
   - **백엔드** (`screen/script/` — 8 파일): `ScriptValidator`(주석 strip + ';' 분할 prefix 검사 + schema [A-Za-z0-9_]+ sanitize, 원본 _validate_select_only + _strip_sql_comments 동등) + `ScriptExecutor`(인터페이스 + inner Result/ColumnInfo) + `JdbcScriptExecutor`(Oracle: NLS_DATE_FORMAT → SET TRANSACTION READ ONLY → execute → rollback; PG: SET statement_timeout '30s' → SET search_path → SET TRANSACTION READ ONLY → _split_pg_stmts 분리 → 마지막 ResultSet → rollback; fetchmany(max+1) 동등으로 truncated 판정) + `ScriptService`(검증 → 실행 → 표준 ScreenResponse 조립, ColumnType 매핑 NUMBER/DATETIME/STRING 보강) + `ScriptController`(GET `/labs/api/script/schemas`, POST `/labs/api/script/run`, 검증/실행 오류는 200+ok=false 봉투 — 원본 동등) + `ScriptRunRequest/Result` + `ScriptSchemasResult`.
@@ -193,11 +202,11 @@
   - **신규 패턴 확립**: ① POST 액션 화면 골격 + 표준 봉투 일관성 ② 동적 컬럼 화면(ScreenResponse.builder 의 동적 column/row API 활용) ③ READ ONLY 트랜잭션 2중 방어 ④ 오류 200+ok=false 통일.
 
 ## 진행 누계
-- **포팅 완료 화면: 13 / 24** (overview + Summary 10Min/1Hour + Session + capacity + license + alert + query + top_segment + temp_table + vacuum + age + **script_manager**)
-- **남은 화면 (11)**: history · report · alarm_history · alert_svc_config · config_page · config_dump · control_process · char_setting · license_check · disk(vacuum_log) · partition 관리
+- **포팅 완료 화면: 14 / 24** (overview + Summary 10Min/1Hour + Session + 8 simple + script_manager + **alert_svc_config**)
+- **남은 화면 (10)**: history · report · alarm_history · config_page · config_dump · control_process · char_setting · license_check · disk(vacuum_log) · partition 관리
 
 ## 다음 첫 액션
-1. **A 표 2번 alert_svc_config(373)** 또는 **3번 license_check(407)** — 폼 + 검증 + 저장 패턴 확립(POST 액션 두 번째 사례)
+1. **A 표 3번 license_check(407)** — 라이선스 + 인스턴스 정보 + DGS PORT 동적 컬럼(B-1 동반)
 2. **A 표 4번 report(475)** · **5번 alarm_history(566)** — Daily Report 카드 + 로그/zip 파싱
 3. **A 표 6번 control_process(574)** · **7~8번 config_page/dump(800/886)** — POST 액션 본격
 4. **A 표 9번 history(1294)** — 대규모 view + 차트
