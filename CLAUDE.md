@@ -6,11 +6,15 @@
 ## 0. 한눈에
 
 - 프로젝트: 기존 MaxGauge Inspector Labs를 재구현(rewrite). **풀스택 — 백엔드(Java) + 프론트(React SPA)를 모두 우리가 구축한다.**
-- **핵심 목표: 기존 Inspector Labs 의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능한 것 = **개발 스택·언어·디자인·보안요소** 뿐. 기능·화면 구성·SQL·설정 파일·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** (포팅 규약은 I절)
-- **포팅 베이스(SSOT)**: `release/inspector/Labs/Inspector/python-utils/` — Labs 변형(2311 라인 + 2026-04 PG 스키마 인식 패치). MaxGauge 정식 빌드(2311/2407/2604)들과는 SQL 일부가 다름. 이 트리가 우리 정본이다.
+- **핵심 목표: 기존 Inspector 의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능한 것 = **개발 스택·언어·디자인·보안요소** 뿐. 기능·화면 구성·SQL·설정 파일·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** (포팅 규약은 I절)
+- **지원 버전: MaxGauge 2407 ~ 2604 및 이후**. 2311 은 지원 대상 아님(EOL). 2407 = 2506 = 2604 SQL 동일이라 **단일 SQL 셋으로 2407+ 전 버전 커버**. 미래 버전이 SQL 분기를 요구하면 그 시점에 신규 분기 도입(현 시점 미도입).
+- **포팅 베이스(SSOT, 정식 2604 라인)**:
+  - Oracle: `/home/inspector/ORACLE/2604/Inspector/python-utils/sql_library.py` 등(2407/2506/2604 동일)
+  - PG    : `/home/inspector/PG/2604/Labs/Inspector/python-utils/sql_library.py`
+  - 기타 모듈(`db_utils.py`, `system_utils.py`, `auth.py`, `pages/*.py`): 동일 정식 트리(2604) 기준
+  - `release/inspector/Labs/` 의 변형 트리는 **참조 명세에서 폐기**(2026-06-02 정정). 정식 2604 사본을 git 트리에 두는 방안은 별도 ADR 검토.
 - 부차 목적: 보안 취약점 개선(SHA256 → 강한 알고리즘 등) + 기존 MaxGauge 제품과 스택 통일(백엔드 Java, 프론트는 MaxGauge VI 표준)
-- 기존 Python/HTTP/HTML 코드(`Labs/`)는 "참조 명세"이며 수정 대상이 아니다 (순수 `http.server` 기반 — README의 "FastAPI" 표기는 부정확)
-- 신규 코드: 백엔드 `java/`(Spring Boot REST API) + 프론트(React SPA, 별도 레포). `Labs/`는 참조만.
+- 신규 코드: 백엔드 `java/`(Spring Boot REST API) + 프론트(React SPA, 별도 레포). 정식 2604 트리는 참조만.
 - 백엔드 개발은 반드시 이 서버에서 수행한다 (MaxGauge 연동 필수). 프론트는 API 모킹(MSW)으로 분리 개발 가능.
 
 ## A. 행동 원칙 (Karpathy 4원칙)
@@ -131,7 +135,7 @@
 - 프론트: `feature`(FSD) 하나가 **공통 컴포넌트를 조합**한다. 화면이 UI를 직접 조립하지 않는다.
 
 **SQL 충실 이식 (백엔드)**
-- 베이스 = `release/inspector/Labs/Inspector/python-utils/sql_library.py` (Labs 변형, 0절 SSOT).
+- 베이스 = 정식 2604 라인 sql_library.py (0절 SSOT). 2407 = 2506 = 2604 동일이라 단일 셋으로 2407+ 커버.
 - 원본 `_SQL_*` 상수 본문을 **문자 그대로** mapper XML 에 옮긴다. 컬럼 alias("DB ID", INSTANCE_NAME, …) 보존.
 - 허용 변경: SQL*Plus 지시어 제거(`SET LINESIZE`, `COLUMN ... FORMAT`), psql `\` 메타 제거, 다중문 `$$ LANGUAGE plpgsql;` 분리(JDBC 단일문). 그 외 토큰 변경 금지.
 - 결과 매핑: 원본 alias → Java 필드는 `resultMap` 명시. `map-underscore-to-camel-case` 우회 의존 금지.

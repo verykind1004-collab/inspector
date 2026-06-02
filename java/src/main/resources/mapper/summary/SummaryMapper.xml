@@ -4,12 +4,16 @@
 
 <!--
   Summary Check 진단 SQL. databaseId 로 Oracle/PG 분기(원본의 db_type 분기와 동등).
-  원본: Labs 변형(release/inspector/Labs/Inspector/python-utils/sql_library.py)
-        _SQL_SUMMARY_10MIN / _SQL_SUMMARY_1HOUR / _SQL_PG_SUMMARY_10MIN / _SQL_PG_SUMMARY_1HOUR
 
-  1:1 동등 포팅 원칙:
-   - SQL 본문(WHERE/JOIN/CASE/컬럼 alias/세미콜론 외 모든 토큰)을 원본 그대로 유지.
-   - 제거 가능한 것은 JDBC 무관 부분뿐 = SQL*Plus 지시어(SET/COLUMN), psql 메타.
+  원본(SSOT): 정식 2604 라인. 2407 = 2506 = 2604 동일이라 단일 SQL 셋으로 2407+ 전 버전 커버.
+   - Oracle: /home/inspector/ORACLE/2604/Inspector/python-utils/sql_library.py
+             _SQL_SUMMARY_10MIN / _SQL_SUMMARY_1HOUR
+   - PG    : /home/inspector/PG/2604/Labs/Inspector/python-utils/sql_library.py
+             _SQL_PG_SUMMARY_10MIN / _SQL_PG_SUMMARY_1HOUR
+
+  1:1 동등 포팅 원칙(CLAUDE.md I절):
+   - SQL 본문(WHERE/JOIN/CASE/컬럼 alias/ORDER BY/공백)을 원본 그대로 유지.
+   - 제거 가능한 것은 JDBC 무관 부분뿐 = SQL*Plus 지시어(SET/COLUMN), psql 메타, 끝 세미콜론.
    - ResultSet 라벨 -> SummaryRow 필드는 resultMap 으로 명시(원본 alias 보존).
 -->
 <mapper namespace="com.exem.inspector.screen.summary.SummaryMapper">
@@ -24,7 +28,7 @@
         <result column="DELAY_INFO"    property="delayInfo"/>
     </resultMap>
 
-    <!-- ── 10Min Summary (Oracle) — _SQL_SUMMARY_10MIN ──────────────────── -->
+    <!-- ── 10Min Summary (Oracle) — _SQL_SUMMARY_10MIN (정식 2604) ──────── -->
     <select id="findSummary10Min" resultMap="summaryRow" databaseId="oracle">
         WITH expect AS (
             SELECT TRUNC(SYSDATE,'HH24')
@@ -56,11 +60,13 @@
             END AS DELAY_INFO
         FROM sum_raw
         ORDER BY
-            summary_time ASC NULLS FIRST,
+            CASE WHEN status = 'CHECK' THEN 1
+                 WHEN status = 'WAITING' THEN 2
+                 ELSE 3 END,
             db_id ASC
     </select>
 
-    <!-- ── 10Min Summary (PostgreSQL) — _SQL_PG_SUMMARY_10MIN ───────────── -->
+    <!-- ── 10Min Summary (PostgreSQL) — _SQL_PG_SUMMARY_10MIN (정식 2604) ─ -->
     <select id="findSummary10Min" resultMap="summaryRow" databaseId="postgresql">
         WITH expect AS (
             SELECT date_trunc('hour', localtimestamp)
@@ -94,11 +100,11 @@
             END AS DELAY_INFO
           FROM sum_raw
          ORDER BY
-          summary_time ASC NULLS FIRST,
+          CASE status WHEN 'CHECK' THEN 1 WHEN 'WAITING' THEN 2 ELSE 3 END,
           db_id ASC
     </select>
 
-    <!-- ── 1Hour (Daily) Summary (Oracle) — _SQL_SUMMARY_1HOUR ──────────── -->
+    <!-- ── 1Hour (Daily) Summary (Oracle) — _SQL_SUMMARY_1HOUR (정식 2604) ─ -->
     <select id="findSummary1Hour" resultMap="summaryRow" databaseId="oracle">
         WITH expect AS (
             SELECT TRUNC(SYSDATE - INTERVAL '1' HOUR, 'HH24') AS expected_time,
@@ -126,11 +132,11 @@
             END AS DELAY_INFO
         FROM sum_raw
         ORDER BY
-            summary_time ASC NULLS FIRST,
-            db_id ASC
+            CASE status WHEN 'CHECK' THEN 1 WHEN 'WAITING' THEN 2 ELSE 3 END,
+            summary_time DESC, instance_name
     </select>
 
-    <!-- ── 1Hour (Daily) Summary (PostgreSQL) — _SQL_PG_SUMMARY_1HOUR ───── -->
+    <!-- ── 1Hour (Daily) Summary (PostgreSQL) — _SQL_PG_SUMMARY_1HOUR (정식 2604) ─ -->
     <select id="findSummary1Hour" resultMap="summaryRow" databaseId="postgresql">
         WITH expect AS (
             SELECT date_trunc('hour', localtimestamp - interval '1 hour') AS expected_time,
@@ -162,8 +168,14 @@
             END AS DELAY_INFO
           FROM sum_raw
          ORDER BY
-          summary_time ASC NULLS FIRST,
-          db_id ASC
+          CASE status
+            WHEN 'CHECK'   THEN 1
+            WHEN 'WAITING' THEN 2
+            WHEN 'OK'      THEN 3
+            ELSE 4
+          END,
+          summary_time DESC,
+          instance_name
     </select>
 
 </mapper>

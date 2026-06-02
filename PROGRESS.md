@@ -1,12 +1,16 @@
 # PROGRESS — MaxGauge Inspector Labs (Java 재구현)
 
-## 핵심 목표 (2026-06-02 재정의 — 1:1 동등 포팅)
-**기존 Inspector Labs(release/inspector/Labs/, Labs 변형 2311+PG패치)의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능 = **스택·언어·디자인·보안** 만. 기능·화면 구성·SQL 본문·설정 파일 스키마·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** 풀스택(백엔드 Java + 프론트 React SPA). 규약 = CLAUDE.md 0/H/I절.
+## 핵심 목표 (2026-06-02 재정의 — 1:1 동등 포팅 + 2407~2604 전 버전 지원)
+**기존 Inspector 의 모든 기능을 1:1 동등하게 재구현한다.** 변경 가능 = **스택·언어·디자인·보안** 만. 기능·화면 구성·SQL 본문·설정 파일 스키마·동작은 원본과 동일. **원본에 없는 새 화면/기능 추가 금지.** 풀스택(백엔드 Java + 프론트 React SPA). 규약 = CLAUDE.md 0/H/I절.
 
-이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 24개 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
+**지원 버전 = MaxGauge 2407 ~ 2604 및 이후** (2311 제외). 2407 = 2506 = 2604 SQL 동일이라 단일 SQL 셋으로 커버.
+
+**포팅 SSOT = 정식 2604 라인**: `/home/inspector/ORACLE/2604/Inspector/python-utils/` + `/home/inspector/PG/2604/Labs/Inspector/python-utils/`. 이전에 베이스로 삼았던 `release/inspector/Labs/` 의 Labs 변형(2311+패치)은 폐기(2026-06-02 정정).
+
+이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
 ## 현재 작업
-3.5 단계(원칙 재정렬 + SQL alias 정정) 완료 직후 → Phase B(ADR 0001 스택 풀세트 + 24개 화면 단계 포팅).
+3.5 단계(원칙 재정렬 + SQL alias 정정 + 베이스 정식 2604 라인 전환) 완료 직후 → Phase B(ADR 0001 스택 풀세트 + 24개 화면 단계 포팅).
 
 ## 마지막 완료
 - 서버 git 작업트리 `release/inspector` (clone, public), git config, 브랜치 `setup/foundation`
@@ -36,16 +40,20 @@
   - **검증: clean test BUILD SUCCESS, 19 tests PASS**
   - 라이브 저장소 런타임 검증은 당시 보류로 보고했으나 **사실 환경에 접속정보 충분**(3.5 단계에서 정정)
 
-- **버전 분기 검토 + 1:1 동등 원칙 재정렬 + SQL alias 정정 (3.5 단계, 2026-06-02, 미커밋)**:
+- **버전 분기 검토 + 1:1 동등 원칙 재정렬 + SQL alias 정정 (3.5 단계, 2026-06-02, fcef342 push)**:
   - 검토 결과: 명시적 if-else 버전 분기 없음. 빌드별 sql_library.py 분리 방식. **2311 vs 2407+ 두 라인**(2407=2506=2604 동일), 주로 PG 파티션 SQL 차이.
-  - 우리 베이스(`release/inspector/Labs/`)는 **Labs 변형 = 2311 라인 + 2026-04 PG 스키마 인식 패치**. 정식 빌드 어느 것과도 다름. Summary SQL md5 확인 결과 정식 라인은 동일·우리 베이스는 별개. → **베이스 = Labs 변형 확정**(사용자 결정).
-  - **헌법 재정리**: CLAUDE.md 0절 "확장 플랫폼" 도그마 폐기 → "1:1 동등 포팅" 명문화. I절 제목·본문 재작성("화면 포팅 규약 1:1 동등 + 공통화 강제", SQL 충실 이식 원칙, 원본 24개 화면 인벤토리 명시). H절에 신규 화면·기능 추가 금지/SQL 본문 임의 변경 금지/설정 스키마 변경 금지 추가.
-  - **SQL alias 정정**: SummaryMapper.xml 4개 select 의 컬럼 alias 를 소문자 통일 → 원본(`"DB ID"`/INSTANCE_NAME/SUMMARY_TYPE/LAST_SUMMARY/STATUS/DELAY_INFO) 그대로. resultMap 도입으로 alias→필드 명시 매핑(map-underscore-to-camel-case 우회 의존 제거). SQL 의미는 본래도 동일이었고 alias만 정정.
-  - **환경 인지 정정**: 라이브 저장소 접속정보 공란이라 보고했던 것은 잘못. `/home/inspector/ORACLE/{2311,2407,2506,2604}/Inspector/python-utils/service_config.json` 등에 mxg2604@10.10.45.136:1521/ORACLE19 등 전 버전 접속정보(비번 평문) 보유. 리스너 TCP_OK 확인. apm_db_info·ora_last_summary 는 실 운영 저장소에 존재 → **실 저장소 런타임 검증 즉시 가능**.
+  - **헌법 재정리**: CLAUDE.md 0절 "확장 플랫폼" 도그마 폐기 → "1:1 동등 포팅" 명문화. I절 재작성. H절에 금지 항목 추가. SummaryMapper.xml alias 원복(`"DB ID"`/INSTANCE_NAME 등)+resultMap.
+  - **환경 인지 정정**: 라이브 저장소 접속정보 보유 확인(`/home/inspector/ORACLE/*/Inspector/python-utils/service_config.json`, mxg2604@10.10.45.136:1521/ORACLE19 등). TCP_OK. **실 저장소 런타임 검증 즉시 가능**.
+
+- **베이스 정식 2604 라인 전환 + Summary SQL 재정정 (3.6 단계, 2026-06-02, 미커밋)**:
+  - **사용자 결정 재정정(2026-06-02)**: "버전은 2407~2604 등등 모든 버전을 만족해야 함" → 베이스 = Labs 변형(2311+패치) → **정식 2604 라인으로 변경**. 2407=2506=2604 SQL 동일이라 단일 셋으로 2407+ 전 버전 커버.
+  - **SSOT 갱신**: Oracle `/home/inspector/ORACLE/2604/Inspector/python-utils/sql_library.py` / PG `/home/inspector/PG/2604/Labs/Inspector/python-utils/sql_library.py`. CLAUDE.md 0절·I절 SSOT 표기 갱신.
+  - **SummaryMapper.xml 재정정**: 정식 2604 라인 본문(md5 `b9c31c07`·`74757197`·`1baa19c1`·`cc8b50a7`)으로 4개 select 재포팅. **핵심 차이 = ORDER BY**(정식은 상태 우선순위 CHECK→WAITING→OK + 보조키, Labs 변형은 summary_time NULLS FIRST + db_id). 운영상 정식이 더 합리적. resultMap 그대로.
+  - 컬럼 alias·CASE 본문 등 나머지는 동일.
 
 ## 다음 첫 액션 (새 세션에서 이어갈 때 여기부터)
-**Phase A (3.5 단계 정리 — 즉시 처리)**
-1. mapper alias 정정 + 헌법·PROGRESS 재정리 정정 커밋 + push (브랜치 `setup/foundation`)
+**Phase A2 (3.6 단계 정리 — 즉시 처리)**
+1. mapper 정식 2604 재정정 + 헌법·PROGRESS 베이스 갱신 정정 커밋 + push (브랜치 `setup/foundation`)
 2. clean test 19 PASS 유지 확인
 
 **Phase B (1:1 동등 원칙 하 풀세트 구현)**
