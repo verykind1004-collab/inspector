@@ -18,8 +18,12 @@ public class HistoryController {
         this.service = service;
     }
 
-    /** {@code GET /labs/api/history/{view:os|tbs|service|qcnt|summary}?days=7&limit=500}. */
-    @GetMapping("/labs/api/history/{view:os|tbs|service|qcnt|summary}")
+    /**
+     * {@code GET /labs/api/history/{view:os|tbs|service|heap|qcnt|summary}?days=7&limit=500}.
+     *
+     * <p>Session 2 보강: heap view 화이트리스트 추가 — INSP_HEAP_HISTORY 5 컬럼 + service_name 다중 인스턴스 분리.
+     */
+    @GetMapping("/labs/api/history/{view:os|tbs|service|heap|qcnt|summary}")
     public ResponseEntity<ApiResponse<ScreenResponse>> get(
             @PathVariable("view") String view,
             @RequestParam(name = "days",  defaultValue = "7")   int days,
