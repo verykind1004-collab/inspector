@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  원본 pages/partition.py + sql_library 의 partition SQL 1:1.
+  Oracle: dba_tab_partitions 의 P{YYMMDD}{DDD} 형식 파티션 — db_id = SUBSTR(8,3).
+  PG: pg_tables 의 _p{YYMMDD}{DDD} 형식 — db_id = substring(_p[0-9]{6}([0-9]{3})$).
+-->
+<mapper namespace="com.exem.inspector.screen.partition.PartitionMapper">
+
+  <!-- ── 인스턴스 목록 (셀렉터) ─────────────────────────────────────────── -->
+  <select id="findInstances" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT db_id     AS "db_id",
+           instance_name AS "instance_name"
+      FROM apm_db_info
+     ORDER BY db_id
+  </select>
+  <select id="findInstances" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT db_id, instance_name
+      FROM apm_db_info
+     ORDER BY db_id
+  </select>
+
+  <!-- ── Drop List (원본 _SQL_PARTITION_DROP_LIST 1:1 + Oracle) ───────── -->
+  <select id="findDropList" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    WITH part_list AS (
+      SELECT p.table_name,
+             p.partition_name,
+             TO_NUMBER(SUBSTR(p.partition_name, 8, 3)) AS db_id,
+             TRUNC(TO_DATE(SUBSTR(p.partition_name, 2, 6), 'RRMMDD')) AS part_dt
+        FROM dba_tab_partitions p
+       WHERE p.table_owner = USER
+         AND REGEXP_LIKE(p.partition_name, '^P[0-9]{9}$')
+    )
+    SELECT pl.table_name || ' / ' || pl.partition_name AS "partition_to_drop"
+      FROM part_list pl
+      LEFT JOIN apm_db_info d ON pl.db_id = d.db_id
+      LEFT JOIN apm_partition_manage m ON m.table_name = pl.table_name AND m.db_id = pl.db_id
+     WHERE pl.db_id = #{dbId}
+       AND (m.retention_days IS NULL
+            OR pl.part_dt &lt; TRUNC(SYSDATE) - m.retention_days)
+     ORDER BY pl.table_name, pl.partition_name
+  </select>
+
+  <select id="findDropList" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    WITH part_list AS (
+      SELECT regexp_replace(t.tablename, '_p[0-9]{9}$', '') AS table_name,
+             t.tablename AS partition_name,
+             t.schemaname AS schema_name,
+             substring(t.tablename from '_p[0-9]{6}([0-9]{3})$')::int AS db_id,
+             to_date(substring(t.tablename from '_p([0-9]{6})[0-9]{3}$'), 'YYMMDD') AS part_dt
+        FROM pg_tables t
+       WHERE t.schemaname NOT IN ('pg_catalog','information_schema','public')
+         AND t.tablename ~ '_p[0-9]{9}$'
+    )
+    SELECT p.table_name || ' / ' || p.partition_name AS "partition_to_drop"
+      FROM part_list p
+      LEFT JOIN apm_db_info d ON p.db_id = d.db_id
+      LEFT JOIN apm_partition_manage m ON m.table_name = p.table_name AND m.db_id = p.db_id
+     WHERE p.db_id = #{dbId}
+       AND (m.retention_days IS NULL OR p.part_dt &lt; CURRENT_DATE - m.retention_days)
+     ORDER BY p.table_name, p.partition_name
+  </select>
+
+  <!-- ── Drop Targets (실제 DROP 대상, PG worker) ─────────────────────── -->
+  <select id="findDropTargetsPg" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    WITH part_list AS (
+      SELECT t.schemaname AS schema_name,
+             regexp_replace(t.tablename, '_p[0-9]{9}$', '') AS table_name,
+             t.tablename AS partition_name,
+             substring(t.tablename from '_p[0-9]{6}([0-9]{3})$')::int AS db_id,
+             to_date(substring(t.tablename from '_p([0-9]{6})[0-9]{3}$'), 'YYMMDD') AS part_dt
+        FROM pg_tables t
+       WHERE t.schemaname NOT IN ('pg_catalog','information_schema','public')
+         AND t.tablename ~ '_p[0-9]{9}$'
+    )
+    SELECT p.schema_name    AS "schema_name",
+           p.table_name     AS "table_name",
+           p.partition_name AS "partition_name"
+      FROM part_list p
+      LEFT JOIN apm_partition_manage m ON m.table_name = p.table_name AND m.db_id = p.db_id
+     WHERE p.db_id = #{dbId}
+       AND (m.retention_days IS NULL OR p.part_dt &lt; CURRENT_DATE - m.retention_days)
+     ORDER BY p.partition_name
+  </select>
+
+  <!-- ── instance_name → db_id (create-partition) ─────────────────────── -->
+  <select id="findDbIdByInstance" resultType="int">
+    SELECT db_id FROM apm_db_info WHERE instance_name = #{instanceName}
+  </select>
+
+</mapper>
