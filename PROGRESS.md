@@ -9,6 +9,42 @@
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
+
+
+## 세션 2026-06-04~05 (Alert tooltip + Process Gather/Param 완성)
+
+**작업 분기** (handoff [[inspector_rewrite_principle]] 절대 원칙):
+- Task #7 Alert COUNT/ALARM 셀 툴팁 — **완료**
+- Task #5 Process Gather/Param — **완료** (Gather Overview + OBSD + DGM/DGS_n + Param 탭)
+
+**커밋 5개**:
+- BE setup/foundation:
+  - 814c923 alert-times endpoint (Oracle/PG, 7 tests)
+  - 73f26df process/gather/{obsd, log-server} endpoints + LogPathsBlock (14 tests)
+- FE main:
+  - a9c6463 AlertPage + tooltip (cellDecorator prop 추가, 3 tests)
+  - 66789ca ProcessGatherPage 4탭 풀 리팩토링(Overview/OBSD/DGM/DGS_n + Follow 폴링, 6 tests)
+  - c318e6f ProcessParamPage 탭 구조(Search 클라 필터 / per-DG 표, 4 tests)
+
+**검증**:
+- BE: 308 tests PASS (294 → +14)
+- FE: 101 tests PASS (99 → +2 — Alert 3, ProcessGather +1, ProcessParam 동수 4)
+- Lint: 0 errors (warnings 10건 모두 기존)
+- FE build SUCCESS (4.55s, 748KB JS / 111KB CSS)
+- Live BE 검증: alert-times 정상/missing/inject 거부, process/gather/obsd 실제 logDir 응답, log-server tabs+그룹화 OK
+
+**디자인시스템 — 원본 색상 매핑**:
+- 보라 그라데이션(#6366F1→#8B5CF6) → indigo-06 → violet-06
+- 알람명 빨강(#ef4444) → red-06
+- 카드 배경(#F8FAFC/#ECF0F7) → gray-00/01 + indigo-01
+- 초록(#10b981 Follow) → green-06
+
+**남은 작업 (다음 세션 자율 진행)**:
+1. Task #7 License Check + Alarm History 정밀 비교 (원본 vs React 라인 비교 + 누락 복원)
+2. Task #9 사이드바 미노출 페이지 (/services, /report, /config-dump, /history/* 정밀 검증)
+3. Task #10 임의 추가물 정리 — 사용처 grep 후 결정:
+   - script_manager / decrypt / control-process / alert-config.{api,mail,sms} / config
+
 ## 현재 작업 (2026-06-02 — 세션 종료 시점 — 다음 세션에서 일괄 재개)
 
 **완료 누계 (2026-06-02 22시 자율 진행 세션)**:
