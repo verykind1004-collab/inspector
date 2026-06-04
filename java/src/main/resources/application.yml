@@ -18,7 +18,7 @@ inspector:
     # 관리자 고정 자격증명(auth.py 상수). 운영에서 재정의 권장.
     admin-user: maxgauge
     salt: mxg_inspector_salt_v1
-    admin-hash: 91904d642b8d2c4e0c6d72c77099ba77524aa3eef585c56891250ae9283966b2
+    admin-hash: ffb3ac5ee5445547dc04b542cf7d329efeb0178de4148c2ec8a9a877fb3ed316
 
 # 매퍼 위치/네이밍 규약. SqlSessionFactory 는 동적 DataSource 구성 후 활성화된다.
 mybatis:

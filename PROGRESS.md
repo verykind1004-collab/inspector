@@ -258,3 +258,58 @@
 - TBS History 30일 SVG bar chart — 원본 report.py 에 함수 자체 없음. 12개월 Check Resource 표가 동등 시각 요소
 
 **다음 = Screen 2 (alarm_history) 보강** — 직전 commit `83b1e0a` 압축 항목 재확인 후 1:1 동등 복원.
+
+---
+
+## 2026-06-04 새벽 세션 — screen 4-6 + B-1 BE 1:1 동등 복원 (Session 2 마무리)
+
+**screen 1~3 완료 후 screen 4-6 + B-1 4개 항목 BE 풀스택 보강 + 단위 테스트 + 일괄 commit.**
+
+**screen 4 (config_page)** — 원본 GAP 정정:
+- 핸드오프의 "apm_db_info 인스턴스 CRUD" 가정은 잘못된 추정 — apm_db_info CRUD 는 char_setting 등 다른 화면에서 처리. config_page 원본은 (1) JSON textarea → 정교한 폼 UI (2) insp_config.json CRUD (3) Collection Schedule + Drop 토글이 실제 GAP.
+- BE 보강: InspHistoryConfig DTO + ConfigService.readInspHistory/saveInspHistory + ConfigController GET/POST `/labs/api/config/insp-history`. 원본 `history.py::_load_insp_config` 1:1 동등 (default false/false/31/10, 키 순서 보존).
+- ConfigServiceTest 10 신규.
+
+**screen 5 (config_dump)** — 별도 화면 분리:
+- ConfigDumpMenu (DTO) — 원본 MENU_DEFS 5 메뉴 (instance/account/alert/sms/repository) 1:1 + tables/sequences.
+- ConfigDumpPayload — {filename_base, db_type, selected_menus, tables, sequences, skipped}.
+- ConfigDumpService — menus() / dump(menuKeys) + safeValue (Timestamp/BigDecimal/byte[] 변환 — 원본 `_json_safe` 1:1). DataSource 미주입 시 메타만 반환.
+- ConfigDumpController — GET `/labs/api/config-dump/menus`, POST `/labs/api/config-dump`.
+- ConfigDumpServiceTest 12 신규.
+
+**screen 6 (history)** — INSP_HEAP_HISTORY 6번째 view 추가:
+- HistoryMapper.findHeapHistory 신규 (Oracle/PG 분기) — INSP_HEAP_HISTORY 5 컬럼 (collected_at / service_name / heap_used_mb / heap_alloc_mb / heap_max_mb).
+- HistoryService SPECS 에 "heap" 추가, service_name 컬럼이 다중 인스턴스 분리 기준.
+- 5 view → **6 view** (os/tbs/service/**heap**/qcnt/summary).
+- HistoryServiceTest 10 신규.
+
+**B-1 license DGS PORT 동적 컬럼** — 원본 `license.py::_get_dgs_port_map` 1:1:
+- DgsPortResolver (Component) — `_DGS_SUMMARY_LINE_RE` 정규식 1:1 + DGServer.xml gather_port 파싱 + DGS_<port>.log 우선 + mtime 최신 fallback + 여러 DGS_S 같은 sid 시 시각 늦은 port 채택.
+- LicenseDgsPortEnricher — ScreenResponse 빌더 재사용으로 dgs_port 컬럼 + 행 enrich (db_id → port, 매칭 없으면 "-").
+- SimpleScreenController — license 응답 후처리 분기 추가.
+- DgsPortResolverTest 11 신규 — XML 파싱 / scanLastBySid / pickLogFile 우선순위 + mtime 정렬.
+
+**검증**:
+- BE clean test: 138 → **181 PASS** (+43)
+  - screen 4 ConfigServiceTest +10 / screen 5 ConfigDumpServiceTest +12 / screen 6 HistoryServiceTest +10 / B-1 DgsPortResolverTest +11 (= +43)
+- FE 변경 없음 (정교한 폼 UI 는 1500+ 라인 부담으로 별도 세션 분리)
+- BE commit `09f2677` setup/foundation
+
+**FE 정교한 폼 UI 보강 후속 항목 (다음 세션)**:
+- ConfigPage 정교한 폼 UI (Repository DB 필드별 + Service Paths + Log Paths + Inspector History Collection Settings/Schedule/Drop 토글) — 원본 config_page.py 800 lines 시각 구조.
+- ConfigDumpPage 별도 라우트 + 정렬/검색/JSON 다운로드 UI.
+- HistoryPage heap view 탭 + SVG 시계열 차트 (CPU%/Mem%/Heap%) — 원본 history.py 1294 lines 차트 부분.
+- license Instance List FE 에 DGS PORT 컬럼 노출 (BE 응답에 이미 포함).
+
+**Session 2 총합 누계**:
+- BE clean test: 95 (Session 시작) → **181 PASS** (+86)
+- FE test: 23 → 32 PASS (+9)
+- BE commits (Session 2): `3b3161c` (report) → `ac3c13f` (alarm_history) → `315eb42` (control_process obsd) → `09f2677` (screen 4-6 + B-1) = **4 commits**
+- FE commits (Session 2): `69a0d6a` (report) → `6edde36` (alarm_history) = **2 commits**
+- HTML 보고서: screen-04-report / screen-05-alarm-history / screen-06-control-process / screen-07-08-config / screen-09-history 모두 "Session 2 보강" 섹션 추가.
+- 화면 누계 21/24 (보강 작업이므로 신규 화면 카운트 없음). control_process obsd + license DGS PORT 두 항목은 기존 화면 완성도 보강.
+
+**환경 마무리**:
+- BE :8083 재기동 (새 클래스 + admin-hash 정본 원복)
+- FE :5173 그대로 유지
+- admin-hash 임시 패치 (`91904d...`) → 정본 (`ffb3ac...`) 복원, `/tmp/application.yml.bak` 정리
