@@ -29,9 +29,16 @@ import com.exem.inspector.common.web.screen.ScreenResponse;
 public class PartitionController {
 
     private final PartitionService service;
+    private final PartitionTimeService timeService;
 
-    public PartitionController(PartitionService service) {
+    public PartitionController(PartitionService service, PartitionTimeService timeService) {
         this.service = service;
+        this.timeService = timeService;
+    }
+
+    @GetMapping("/labs/api/partition/time-check")
+    public ResponseEntity<ApiResponse<PartitionTimeService.TimeCheckResult>> timeCheck() {
+        return ResponseEntity.ok(ApiResponse.ok(timeService.check()));
     }
 
     @GetMapping("/labs/api/partition/instances")
