@@ -24,10 +24,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 /**
- * Config Page 의 read/write/connection-test 서비스 — 원본 config_page.py + config_dump.py 핵심.
+ * Config Page 의 read/write/connection-test + Inspector History config CRUD.
  *
  * <p>read = service_config.json 그대로 노출. write = 새 본문 저장 + ServiceConfig.reload().
- * connection-test = Repository DB TCP + DGServer/PJS 포트 listen 점검.
+ * connection-test = Repository DB TCP + 각 서비스 home 디렉토리 존재 여부.
+ * insp-history = insp_config.json (Inspector History 설정) read/save.
  */
 @Service
 public class ConfigService {
@@ -36,13 +37,16 @@ public class ConfigService {
 
     private final ServiceConfig serviceConfig;
     private final String configPath;
+    private final String inspConfigPath;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
 
     public ConfigService(ServiceConfig serviceConfig,
-                         @Value("${inspector.service-config-path}") String configPath) {
+                         @Value("${inspector.service-config-path}") String configPath,
+                         @Value("${inspector.insp-config-path:config/insp_config.json}") String inspConfigPath) {
         this.serviceConfig = serviceConfig;
         this.configPath = configPath;
+        this.inspConfigPath = inspConfigPath;
     }
 
     /** 현재 service_config.json 내용을 그대로 읽어 노출. */
@@ -77,7 +81,6 @@ public class ConfigService {
     public ConnectionTestResult connectionTest() {
         List<ConnectionTestResult.Item> out = new ArrayList<>();
 
-        // Repository DB
         com.exem.inspector.common.db.RepositoryConfig repo = serviceConfig.repository();
         if (repo.isConfigured()) {
             int port = repo.port() > 0 ? repo.port() : 1521;
@@ -94,7 +97,6 @@ public class ConfigService {
             out.add(new ConnectionTestResult.Item("Repository DB", "SKIP", "Not configured"));
         }
 
-        // DGServer_M / S* / PlatformJS — home 디렉토리 존재 여부 + (있다면) home 표시
         com.exem.inspector.config.ServicesBlock svc = serviceConfig.services();
         addPathProbe(out, "DGServer_M", svc.dgserverM());
         List<String> sList = svc.dgserverS();
@@ -119,9 +121,62 @@ public class ConfigService {
         }
     }
 
+    // ── Inspector History config (insp_config.json) ─────────────────────────
+
+    /** 원본 history.py::_load_insp_config 1:1 — 누락 키는 default 로 채움. */
+    @SuppressWarnings("unchecked")
+    public InspHistoryConfig readInspHistory() {
+        Path path = Paths.get(inspConfigPath);
+        if (!Files.exists(path)) return InspHistoryConfig.defaults();
+        try {
+            Map<String, Object> raw = objectMapper.readValue(path.toFile(), Map.class);
+            return new InspHistoryConfig(
+                    bool(raw.get("enabled"), false),
+                    bool(raw.get("tables_initialized"), false),
+                    intVal(raw.get("retention_days"), 31),
+                    intVal(raw.get("log_retention_days"), 10));
+        } catch (IOException e) {
+            log.warn("insp_config.json read 실패 — default 사용", e);
+            return InspHistoryConfig.defaults();
+        }
+    }
+
+    /** insp_config.json 저장 — 원본 키 순서 보존(enabled / tables_initialized / retention_days / log_retention_days). */
+    public InspHistoryConfig saveInspHistory(InspHistoryConfig body) throws IOException {
+        if (body == null) throw new IllegalArgumentException("Body is required");
+        Path path = Paths.get(inspConfigPath);
+        if (path.getParent() != null) Files.createDirectories(path.getParent());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("enabled", body.isEnabled());
+        out.put("tables_initialized", body.isTablesInitialized());
+        out.put("retention_days", body.getRetentionDays());
+        out.put("log_retention_days", body.getLogRetentionDays());
+        String json = objectMapper.writeValueAsString(out);
+        Files.write(path, json.getBytes(StandardCharsets.UTF_8));
+        return body;
+    }
+
+    public String getInspConfigPath() { return inspConfigPath; }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object o) {
         if (o instanceof Map) return (Map<String, Object>) o;
         return Collections.emptyMap();
+    }
+
+    private static boolean bool(Object o, boolean defv) {
+        if (o instanceof Boolean) return (Boolean) o;
+        if (o == null) return defv;
+        String s = String.valueOf(o).trim().toLowerCase();
+        if (s.equals("true") || s.equals("1") || s.equals("yes")) return true;
+        if (s.equals("false") || s.equals("0") || s.equals("no")) return false;
+        return defv;
+    }
+
+    private static int intVal(Object o, int defv) {
+        if (o instanceof Number) return ((Number) o).intValue();
+        if (o == null) return defv;
+        try { return Integer.parseInt(String.valueOf(o).trim()); }
+        catch (NumberFormatException e) { return defv; }
     }
 }

@@ -20,7 +20,7 @@ public class ConfigController {
         this.service = service;
     }
 
-    /** GET /labs/api/config — service_config.json 전체 노출(config_page + config_dump 의 데이터 동일). */
+    /** GET /labs/api/config — service_config.json 전체 노출. */
     @GetMapping("/labs/api/config")
     public ResponseEntity<ApiResponse<ConfigPagePayload>> read() {
         return ResponseEntity.ok(ApiResponse.ok(service.read()));
@@ -39,9 +39,29 @@ public class ConfigController {
         }
     }
 
-    /** GET /labs/api/config/connection-test — Repository DB TCP + 각 서비스 home 디렉토리 존재 여부. */
+    /** GET /labs/api/config/connection-test — Repository DB TCP + 서비스 home 점검. */
     @GetMapping("/labs/api/config/connection-test")
     public ResponseEntity<ApiResponse<ConnectionTestResult>> connectionTest() {
         return ResponseEntity.ok(ApiResponse.ok(service.connectionTest()));
+    }
+
+    // ── Inspector History config (insp_config.json) ──────────────────────
+
+    /** GET /labs/api/config/insp-history — 원본 history.py::_load_insp_config 와 동등. */
+    @GetMapping("/labs/api/config/insp-history")
+    public ResponseEntity<ApiResponse<InspHistoryConfig>> readInspHistory() {
+        return ResponseEntity.ok(ApiResponse.ok(service.readInspHistory()));
+    }
+
+    /** POST /labs/api/config/insp-history — insp_config.json 저장. */
+    @PostMapping("/labs/api/config/insp-history")
+    public ResponseEntity<ApiResponse<InspHistoryConfig>> saveInspHistory(@RequestBody(required = false) InspHistoryConfig body) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(service.saveInspHistory(body)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.ok(ApiResponse.error("Write failed: " + e.getMessage()));
+        }
     }
 }

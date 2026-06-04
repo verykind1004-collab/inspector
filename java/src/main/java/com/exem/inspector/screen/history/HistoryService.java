@@ -18,9 +18,10 @@ import com.exem.inspector.common.web.screen.ScreenResponse;
 import com.exem.inspector.config.ServiceConfig;
 
 /**
- * History 화면 — INSP_*_HISTORY 5 view 의 단일 통합 서비스.
+ * History 화면 — INSP_*_HISTORY 6 view 의 단일 통합 서비스 (Session 2: 5→6, HEAP 추가).
  *
- * <p>원본 pages/history.py (1294라인) 의 표 부분과 동등(차트는 후속). view 별 컬럼 메타 + SQL 호출.
+ * <p>원본 pages/history.py (1294라인) 의 표 부분과 동등(차트는 후속).
+ * view 별 컬럼 메타 + SQL 호출. heap view 의 service_name 컬럼이 다중 인스턴스 분리 기준.
  */
 @Service
 public class HistoryService {
@@ -58,6 +59,16 @@ public class HistoryService {
                         col("service_name", "Service",      ColumnType.STRING),
                         col("status",       "Status",       ColumnType.STRING)),
                 HistoryMapper::findServiceHistory));
+        // ── Session 2 보강: HEAP view 추가 (INSP_HEAP_HISTORY 5 컬럼) ───────
+        SPECS.put("heap", new ViewSpec(
+                "Heap History",
+                Arrays.asList(
+                        col("collected_at",  "Collected At", ColumnType.DATETIME),
+                        col("service_name",  "Service",      ColumnType.STRING),
+                        col("heap_used_mb",  "Heap Used MB", ColumnType.NUMBER),
+                        col("heap_alloc_mb", "Heap Alloc MB",ColumnType.NUMBER),
+                        col("heap_max_mb",   "Heap Max MB",  ColumnType.NUMBER)),
+                HistoryMapper::findHeapHistory));
         SPECS.put("qcnt", new ViewSpec(
                 "Query Count History",
                 Arrays.asList(
@@ -125,7 +136,6 @@ public class HistoryService {
         }
     }
 
-    /** mapper method 시그니처 통일을 위한 헬퍼 인터페이스. */
     @FunctionalInterface
     private interface TriCall {
         List<LinkedHashMap<String, Object>> call(HistoryMapper m, int days, int limit);

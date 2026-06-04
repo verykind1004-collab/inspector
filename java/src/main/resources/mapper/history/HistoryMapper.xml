@@ -2,8 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  원본 pages/history.py 의 5 view (OS/TBS/Service/QCnt/Summary). 본 단계는 핵심 컬럼 + 최근 days 일.
-  컬럼 alias 는 원본 INSP_* 테이블 그대로(소문자).
+  원본 pages/history.py 의 6 view (OS/TBS/Service/Heap/QCnt/Summary). 본 단계는 핵심 컬럼 + 최근 days 일.
+  컬럼 alias 는 원본 INSP_* 테이블 그대로(소문자). Session 2 보강: HEAP view 추가 (INSP_HEAP_HISTORY).
 -->
 <mapper namespace="com.exem.inspector.screen.history.HistoryMapper">
 
@@ -64,6 +64,28 @@
     SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
            service_name, status
       FROM insp_service_history
+     WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
+     ORDER BY collected_at DESC
+     LIMIT #{limit}
+  </select>
+
+  <!-- ── HEAP History (Session 2 보강) — INSP_HEAP_HISTORY 컬럼 ───────── -->
+  <select id="findHeapHistory" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           service_name  AS "service_name",
+           heap_used_mb  AS "heap_used_mb",
+           heap_alloc_mb AS "heap_alloc_mb",
+           heap_max_mb   AS "heap_max_mb"
+      FROM INSP_HEAP_HISTORY
+     WHERE collected_at &gt;= SYSDATE - #{days}
+     ORDER BY collected_at DESC
+     FETCH FIRST #{limit} ROWS ONLY
+  </select>
+
+  <select id="findHeapHistory" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "collected_at",
+           service_name, heap_used_mb, heap_alloc_mb, heap_max_mb
+      FROM insp_heap_history
      WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
      ORDER BY collected_at DESC
      LIMIT #{limit}

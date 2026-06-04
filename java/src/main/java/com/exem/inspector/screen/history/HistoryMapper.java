@@ -8,7 +8,8 @@ import org.apache.ibatis.annotations.Param;
 
 /**
  * History 화면용 매퍼 — INSP_OS_HISTORY / INSP_TBS_HISTORY / INSP_SERVICE_HISTORY /
- * INSP_QCNT_HISTORY / INSP_SUMMARY_HISTORY 5종. days 파라미터로 최근 N일 제한.
+ * INSP_HEAP_HISTORY / INSP_QCNT_HISTORY / INSP_SUMMARY_HISTORY 6종.
+ * days 파라미터로 최근 N일 제한. Session 2 보강: HEAP view 추가.
  */
 @Mapper
 public interface HistoryMapper {
@@ -18,6 +19,8 @@ public interface HistoryMapper {
     List<LinkedHashMap<String, Object>> findTbsHistory(@Param("days") int days, @Param("limit") int limit);
 
     List<LinkedHashMap<String, Object>> findServiceHistory(@Param("days") int days, @Param("limit") int limit);
+
+    List<LinkedHashMap<String, Object>> findHeapHistory(@Param("days") int days, @Param("limit") int limit);
 
     List<LinkedHashMap<String, Object>> findQcntHistory(@Param("days") int days, @Param("limit") int limit);
 
