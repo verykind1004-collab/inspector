@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  원본 api_alert_times (alert.py:15) 의 Oracle/PG SQL 과 1:1 동등.
+  결과: DAY (YYYY-MM-DD) / CNT (int). 최근 30일 (instance, alarm) 의 일별 카운트.
+-->
+<mapper namespace="com.exem.inspector.screen.alert.AlertMapper">
+
+  <!-- ── Oracle — 원본 _SQL_ORACLE 부분 ────────────────────────────── -->
+  <select id="findDailyCounts" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(TRUNC(h.time), 'YYYY-MM-DD') AS "DAY",
+           COUNT(*) AS "CNT"
+      FROM apm_db_info a
+      JOIN ora_alarm_history h ON h.db_id = a.db_id
+     WHERE h.time &gt; SYSDATE - 30
+       AND a.instance_name = #{inst}
+       AND h.name = #{alarm}
+     GROUP BY TRUNC(h.time)
+     ORDER BY 1 DESC
+  </select>
+
+  <!--
+    PG — 원본 _SQL_PG 부분. schema 는 인스턴스명 정규화 결과를 식별자로 직접 치환(${}).
+    호출 전 AlertService 가 [^a-z0-9_] 제거 + 비어 있음 거부.
+  -->
+  <select id="findDailyCounts" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(date_trunc('day', b.time), 'YYYY-MM-DD') AS "DAY",
+           COUNT(*) AS "CNT"
+      FROM ${schema}.ora_alarm_history b
+      JOIN apm_db_info a ON a.db_id = b.db_id
+     WHERE a.instance_name = #{inst}
+       AND b.name = #{alarm}
+       AND b.time &gt;= date_trunc('day', NOW() - INTERVAL '1 month')
+     GROUP BY date_trunc('day', b.time)
+     ORDER BY 1 DESC
+  </select>
+
+</mapper>
