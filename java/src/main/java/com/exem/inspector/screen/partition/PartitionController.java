@@ -44,6 +44,11 @@ public class PartitionController {
         return ResponseEntity.ok(ApiResponse.ok(service.partitionCreateCheck()));
     }
 
+    @GetMapping("/labs/api/partition/drop-check")
+    public ResponseEntity<ApiResponse<ScreenResponse>> dropCheck() {
+        return ResponseEntity.ok(ApiResponse.ok(service.partitionDropCheck()));
+    }
+
     @GetMapping("/labs/api/partition/drop-list")
     public ResponseEntity<ApiResponse<PartitionService.DropListResult>> dropList(
             @RequestParam(name = "db_id") int dbId) {

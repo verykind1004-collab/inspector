@@ -36,4 +36,12 @@ public interface PartitionMapper {
      * <p>d1/d2/d3 (YYMMDD) 는 SQL 내부에서 SYSDATE/CURRENT_DATE + N 으로 자체 계산 — 파라미터 불필요.
      */
     List<LinkedHashMap<String, Object>> findPartitionCreateCheck();
+
+    /**
+     * Partition Drop Check — _SQL_PARTITION_DROP / _SQL_PG_PARTITION_DROP 1:1.
+     *
+     * <p>인스턴스 별로 retention_days 초과한 OLD 파티션 개수 + 상태(OK/CHECK).
+     * 컬럼: db_id, instance_name, old_partition_count, status.
+     */
+    List<LinkedHashMap<String, Object>> findPartitionDropCheck();
 }

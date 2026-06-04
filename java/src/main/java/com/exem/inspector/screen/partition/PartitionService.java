@@ -104,6 +104,35 @@ public class PartitionService {
     }
 
     /**
+     * Partition Drop Check — 원본 page_partition_drop 의 표 데이터 1:1.
+     *
+     * <p>인스턴스 별로 retention_days 초과한 OLD 파티션 개수 + 상태(OK/CHECK).
+     * 컬럼: db_id, instance_name, old_partition_count, status.
+     */
+    public ScreenResponse partitionDropCheck() {
+        PartitionMapper mapper = mapperProvider.getIfAvailable();
+        DbType dbType = DbType.fromConfigValue(serviceConfig.repository().dbType());
+        ScreenResponse.Builder b = ScreenResponse.builder("partition_drop", "Partition Drop Check", dbType.name());
+
+        b.column(ColumnDef.of("db_id", "DB ID", ColumnType.NUMBER, ColumnRole.ID));
+        b.column(ColumnDef.of("instance_name", "Instance Name", ColumnType.STRING, ColumnRole.INSTANCE));
+        b.column(ColumnDef.of("old_partition_count", "Old Partition Count", ColumnType.NUMBER, ColumnRole.PLAIN));
+        b.column(ColumnDef.of("status", "Status", ColumnType.STRING, ColumnRole.STATUS));
+
+        if (mapper == null) return b.build();
+        List<LinkedHashMap<String, Object>> rows;
+        try {
+            rows = mapper.findPartitionDropCheck();
+        } catch (RuntimeException e) {
+            log.warn("partitionDropCheck 조회 실패", e);
+            return b.build();
+        }
+        if (rows == null) rows = Collections.emptyList();
+        for (LinkedHashMap<String, Object> r : rows) b.rowFromMap(r);
+        return b.build();
+    }
+
+    /**
      * Drop List 조회 — table 기준 group + partitions[].
      * 원본 응답: {ok, groups: [{table, partitions: []}]} 1:1.
      */

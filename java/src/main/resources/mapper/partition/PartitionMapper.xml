@@ -177,4 +177,96 @@
       instance_name ASC
   </select>
 
+  <!-- ── Partition Drop Check (sql_library._SQL_PARTITION_DROP 1:1) ────────────── -->
+  <!-- 컬럼: db_id, instance_name, old_partition_count, status (OK/CHECK).
+       원본 컬럼 alias 는 대문자+공백 "DB ID" / "INSTANCE NAME" / "OLD PARTITION COUNT" / "STATUS"
+       — Java 측 ColumnDef key 일관성 위해 큰따옴표 snake_case alias 적용. -->
+  <select id="findPartitionDropCheck" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    WITH part_list AS (
+      SELECT
+          p.table_name,
+          p.partition_name,
+          TO_NUMBER(SUBSTR(p.partition_name, 8, 3)) AS db_id,
+          TRUNC(TO_DATE(SUBSTR(p.partition_name, 2, 6), 'RRMMDD')) AS part_dt
+      FROM dba_tab_partitions p
+      WHERE p.table_owner = USER
+        AND REGEXP_LIKE(p.partition_name, '^P[0-9]{9}$')
+    ),
+    flagged_agg AS (
+      SELECT
+          pl.db_id,
+          COUNT(*) AS cnt
+      FROM part_list pl
+      LEFT JOIN apm_db_info d ON pl.db_id = d.db_id
+      LEFT JOIN apm_partition_manage m ON m.table_name = pl.table_name AND m.db_id = pl.db_id
+      WHERE d.db_id IS NULL
+         OR (m.retention_days IS NOT NULL AND (TRUNC(SYSDATE) - pl.part_dt) &gt; m.retention_days)
+      GROUP BY pl.db_id
+    )
+    SELECT
+      COALESCE(d.db_id, f.db_id) AS "db_id",
+      NVL(d.instance_name, '등록되지 않은 DB_ID 입니다.') AS "instance_name",
+      NVL(f.cnt, 0) AS "old_partition_count",
+      CASE
+        WHEN d.db_id IS NULL THEN 'CHECK'
+        WHEN NVL(f.cnt, 0) &gt; 0 THEN 'CHECK'
+        ELSE 'OK'
+      END AS "status"
+    FROM apm_db_info d
+    FULL OUTER JOIN flagged_agg f ON d.db_id = f.db_id
+    WHERE COALESCE(d.db_id, f.db_id) IS NOT NULL
+    ORDER BY
+      DECODE(CASE
+               WHEN d.db_id IS NULL THEN 'CHECK'
+               WHEN NVL(f.cnt, 0) &gt; 0 THEN 'CHECK'
+               ELSE 'OK'
+             END, 'CHECK', 1, 'WAITING', 2, 'OK', 3, 4),
+      COALESCE(d.db_id, f.db_id) ASC
+  </select>
+
+  <select id="findPartitionDropCheck" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    WITH part_list AS (
+      SELECT
+          regexp_replace(t.tablename, '_p[0-9]{9}$', '') AS table_name,
+          t.tablename AS partition_name,
+          t.schemaname AS schema_name,
+          substring(t.tablename from '_p[0-9]{6}([0-9]{3})$')::int AS db_id,
+          to_date(substring(t.tablename from '_p([0-9]{6})[0-9]{3}$'), 'YYMMDD') AS part_dt
+      FROM pg_tables t
+      WHERE t.schemaname NOT IN ('pg_catalog','information_schema','public')
+        AND t.tablename ~ '_p[0-9]{9}$'
+    ),
+    flagged_agg AS (
+      SELECT pl.db_id, pl.schema_name, COUNT(*) AS cnt
+      FROM part_list pl
+      LEFT JOIN apm_db_info d
+             ON pl.db_id = d.db_id AND pl.schema_name = lower(d.instance_name)
+      LEFT JOIN apm_partition_manage m ON upper(m.table_name) = upper(pl.table_name) AND m.db_id = pl.db_id
+      WHERE d.db_id IS NULL
+         OR (m.retention_days IS NOT NULL AND (current_date - pl.part_dt) &gt; m.retention_days)
+      GROUP BY pl.db_id, pl.schema_name
+    )
+    SELECT
+      COALESCE(d.db_id, a.db_id) AS "db_id",
+      COALESCE(d.instance_name, a.schema_name || ' (등록되지 않은 schema)') AS "instance_name",
+      COALESCE(a.cnt, 0) AS "old_partition_count",
+      CASE
+        WHEN d.db_id IS NULL THEN 'CHECK'
+        WHEN COALESCE(a.cnt, 0) &gt; 0 THEN 'CHECK'
+        ELSE 'OK'
+      END AS "status"
+    FROM apm_db_info d
+    FULL OUTER JOIN flagged_agg a
+                ON d.db_id = a.db_id
+               AND lower(d.instance_name) = a.schema_name
+    WHERE COALESCE(d.db_id, a.db_id) IS NOT NULL
+    ORDER BY
+      CASE
+        WHEN d.db_id IS NULL THEN 1
+        WHEN COALESCE(a.cnt, 0) &gt; 0 THEN 1
+        ELSE 3
+      END,
+      COALESCE(d.db_id, a.db_id) ASC
+  </select>
+
 </mapper>
