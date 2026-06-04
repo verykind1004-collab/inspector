@@ -47,18 +47,18 @@
 
     <!-- ── license (Oracle) — _SQL_LICENSE ─────────────────────────────── -->
     <select id="findLicense" resultType="java.util.LinkedHashMap" databaseId="oracle">
-        SELECT db_id, instance_name, sid,
-               rts_version,
-               host_ip, os_type, port AS "RTS PORT", lsnr_port
+        SELECT db_id AS "db_id", instance_name AS "instance_name", sid AS "sid",
+               rts_version AS "rts_version",
+               host_ip AS "host_ip", os_type AS "os_type", port AS "RTS PORT", lsnr_port AS "lsnr_port"
           FROM apm_db_info
          ORDER BY db_id
     </select>
 
     <!-- ── license (PG) — _SQL_PG_LICENSE ──────────────────────────────── -->
     <select id="findLicense" resultType="java.util.LinkedHashMap" databaseId="postgresql">
-        SELECT db_id, instance_name, sid,
-               rts_version,
-               host_ip, os_type, port AS "RTS PORT", lsnr_port
+        SELECT db_id AS "db_id", instance_name AS "instance_name", sid AS "sid",
+               rts_version AS "rts_version",
+               host_ip AS "host_ip", os_type AS "os_type", port AS "RTS PORT", lsnr_port AS "lsnr_port"
         FROM apm_db_info
         ORDER BY db_id
     </select>
@@ -90,23 +90,23 @@
                  TO_NUMBER(TO_CHAR(TRUNC(SYSDATE-1),'YYMMDD') || LPAD(a.db_id,3,'0')) AS part_key
             FROM apm_db_info a)
         SELECT b.db_id AS "DB ID",
-               b.instance_name,
+               b.instance_name AS "instance_name",
                CASE WHEN NVL(lc.download_sql_plan,'N') != 'Y' THEN 'OFF'
                     WHEN EXISTS(SELECT 1 FROM ora_sql_plan p
                                  WHERE p.db_id=b.db_id AND p.partition_key=b.part_key)
-                    THEN 'OK' ELSE 'CHECK' END AS plan_status,
+                    THEN 'OK' ELSE 'CHECK' END AS "plan_status",
                CASE WHEN NVL(lc.download_sql_bind,'N') != 'Y' THEN 'OFF'
                     WHEN EXISTS(SELECT 1 FROM ora_bind_value bv
                                  WHERE bv.db_id=b.db_id AND bv.partition_key=b.part_key)
-                    THEN 'OK' ELSE 'CHECK' END AS bind_status,
+                    THEN 'OK' ELSE 'CHECK' END AS "bind_status",
                CASE WHEN NVL(lc.download_tablespace,'N') != 'Y' THEN 'OFF'
                     WHEN EXISTS(SELECT 1 FROM ora_tablespace_info tbs
                                  WHERE tbs.db_id=b.db_id AND tbs.partition_key=b.part_key)
-                    THEN 'OK' ELSE 'CHECK' END AS tablespace_status,
+                    THEN 'OK' ELSE 'CHECK' END AS "tablespace_status",
                CASE WHEN NVL(lc.download_parameter,'N') != 'Y' THEN 'OFF'
                     WHEN EXISTS(SELECT 1 FROM ora_db_parameter prm
                                  WHERE prm.db_id=b.db_id AND prm.partition_key=b.part_key)
-                    THEN 'OK' ELSE 'CHECK' END AS parameter_status
+                    THEN 'OK' ELSE 'CHECK' END AS "parameter_status"
           FROM base b
           LEFT JOIN ora_lc_config lc ON lc.db_id = b.db_id
           ORDER BY b.instance_name
