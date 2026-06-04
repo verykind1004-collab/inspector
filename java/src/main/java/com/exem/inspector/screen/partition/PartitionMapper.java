@@ -26,4 +26,14 @@ public interface PartitionMapper {
 
     /** apm_db_info 에서 instance_name → db_id 룩업 — create-partition 진입 검증. */
     Integer findDbIdByInstance(@Param("instanceName") String instanceName);
+
+    /**
+     * Partition Create Check — _SQL_ORACLE_PARTITION_CREATE_TMPL / _SQL_PG_PARTITION_CREATE_TMPL 1:1.
+     *
+     * <p>오늘+1/+2/+3 일자에 해당하는 파티션 생성 상태를 인스턴스 별로 집계.
+     * 컬럼: db_id, instance_name, cnt_d1, cnt_d2, cnt_d3, status (OK/CHECK).
+     *
+     * <p>d1/d2/d3 (YYMMDD) 는 SQL 내부에서 SYSDATE/CURRENT_DATE + N 으로 자체 계산 — 파라미터 불필요.
+     */
+    List<LinkedHashMap<String, Object>> findPartitionCreateCheck();
 }

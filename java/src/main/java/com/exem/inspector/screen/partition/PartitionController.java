@@ -10,12 +10,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.exem.inspector.common.web.ApiResponse;
+import com.exem.inspector.common.web.screen.ScreenResponse;
 
 /**
- * Partition 라우터 — 원본 partition.py 의 5 API 1:1 동등.
+ * Partition 라우터 — 원본 partition.py 의 6 API 1:1 동등 + Create Check 표 데이터.
  *
  * <ul>
  *   <li>GET  /labs/api/partition/instances — 인스턴스 셀렉터</li>
+ *   <li>GET  /labs/api/partition/create-check — Partition Create Check 표 데이터 (원본 page_partition_create)</li>
  *   <li>GET  /labs/api/partition/drop-list?db_id= — Drop 후보 목록 (groups)</li>
  *   <li>POST /labs/api/partition/drop?db_id= — 백그라운드 Drop 시작</li>
  *   <li>GET  /labs/api/partition/drop-status — 진행 상태</li>
@@ -35,6 +37,11 @@ public class PartitionController {
     @GetMapping("/labs/api/partition/instances")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> instances() {
         return ResponseEntity.ok(ApiResponse.ok(service.instances()));
+    }
+
+    @GetMapping("/labs/api/partition/create-check")
+    public ResponseEntity<ApiResponse<ScreenResponse>> createCheck() {
+        return ResponseEntity.ok(ApiResponse.ok(service.partitionCreateCheck()));
     }
 
     @GetMapping("/labs/api/partition/drop-list")

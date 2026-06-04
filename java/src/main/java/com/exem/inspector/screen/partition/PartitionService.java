@@ -1,5 +1,6 @@
 package com.exem.inspector.screen.partition;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -18,6 +19,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import com.exem.inspector.common.db.DbType;
+import com.exem.inspector.common.web.screen.ColumnDef;
+import com.exem.inspector.common.web.screen.ColumnRole;
+import com.exem.inspector.common.web.screen.ColumnType;
+import com.exem.inspector.common.web.screen.ScreenResponse;
 import com.exem.inspector.config.ServiceConfig;
 
 /**
@@ -55,6 +60,47 @@ public class PartitionService {
         PartitionMapper m = mapperProvider.getIfAvailable();
         if (m == null) return Collections.emptyList();
         return new ArrayList<>(m.findInstances());
+    }
+
+    /**
+     * Partition Create Check — 원본 page_partition_create 의 표 데이터 1:1.
+     *
+     * <p>인스턴스 별로 D+1/D+2/D+3 파티션 생성 상태를 집계 후 ScreenResponse 로 반환.
+     * 컬럼 label 은 원본 SQL alias 그대로 "DB ID" / "INSTANCE NAME" / "D+1 (YYYYMMDD)" /
+     * "D+2 (YYYYMMDD)" / "D+3 (YYYYMMDD)" / "STATUS".
+     */
+    public ScreenResponse partitionCreateCheck() {
+        PartitionMapper mapper = mapperProvider.getIfAvailable();
+        DbType dbType = DbType.fromConfigValue(serviceConfig.repository().dbType());
+        ScreenResponse.Builder b = ScreenResponse.builder("partition_create", "Partition Create Check", dbType.name());
+
+        // d1/d2/d3 의 YYYYMMDD 문자열 — 컬럼 라벨에 포함 (원본 _SQL_*_PARTITION_CREATE_TMPL.format 와 동등).
+        DateTimeFormatter ymd = DateTimeFormatter.ofPattern("yyyyMMdd");
+        LocalDate today = LocalDate.now();
+        String d1 = today.plusDays(1).format(ymd);
+        String d2 = today.plusDays(2).format(ymd);
+        String d3 = today.plusDays(3).format(ymd);
+
+        b.column(ColumnDef.of("db_id", "DB ID", ColumnType.NUMBER, ColumnRole.ID));
+        b.column(ColumnDef.of("instance_name", "Instance Name", ColumnType.STRING, ColumnRole.INSTANCE));
+        b.column(ColumnDef.of("cnt_d1", "D+1 (" + d1 + ")", ColumnType.STRING, ColumnRole.PLAIN));
+        b.column(ColumnDef.of("cnt_d2", "D+2 (" + d2 + ")", ColumnType.STRING, ColumnRole.PLAIN));
+        b.column(ColumnDef.of("cnt_d3", "D+3 (" + d3 + ")", ColumnType.STRING, ColumnRole.PLAIN));
+        b.column(ColumnDef.of("status", "Status", ColumnType.STRING, ColumnRole.STATUS));
+
+        if (mapper == null) {
+            return b.build();
+        }
+        List<LinkedHashMap<String, Object>> rows;
+        try {
+            rows = mapper.findPartitionCreateCheck();
+        } catch (RuntimeException e) {
+            log.warn("partitionCreateCheck 조회 실패", e);
+            return b.build();
+        }
+        if (rows == null) rows = Collections.emptyList();
+        for (LinkedHashMap<String, Object> r : rows) b.rowFromMap(r);
+        return b.build();
     }
 
     /**
