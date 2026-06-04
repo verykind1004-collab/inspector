@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  원본 sql_library.py 의 vacuum/age/temp_table SQL 1:1.
+  - vacuum / age : PG 전용 (Oracle 미지원 → 빈 셀렉트 → 빈 리스트).
+  - temp_table : PG = pg_tables, Oracle = user_tables. 둘 다 'tt%' prefix.
+  - psql 메타커맨드(\pset)는 JDBC 미지원 → 제거 (원본 동작에 영향 없음).
+-->
+<mapper namespace="com.exem.inspector.screen.disk.DiskMapper">
+
+  <!-- ── PG VACUUM CHECK (sql_library._SQL_PG_VACUUM_CHECK 1:1) ────── -->
+  <select id="findAutoVacuumTargets" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    WITH threshold_calc AS (
+      SELECT schemaname, relname, n_live_tup, n_dead_tup, autovacuum_count, last_autovacuum,
+             (current_setting('autovacuum_vacuum_threshold')::int
+              + current_setting('autovacuum_vacuum_scale_factor')::numeric * n_live_tup) AS vacuum_threshold
+      FROM pg_stat_user_tables
+    ),
+    exceed AS (
+      SELECT * FROM threshold_calc WHERE n_dead_tup &gt; vacuum_threshold
+    ),
+    not_vacuumed AS (
+      SELECT * FROM exceed WHERE last_autovacuum IS NULL OR last_autovacuum &lt; now() - interval '3 days'
+    )
+    SELECT schemaname AS schema, relname AS table_name, n_dead_tup AS dead_tuples,
+           round(vacuum_threshold) AS vacuum_threshold, last_autovacuum
+    FROM not_vacuumed
+    ORDER BY (n_dead_tup - vacuum_threshold) DESC
+  </select>
+
+  <!-- Oracle: vacuum 비지원 → 빈 결과. -->
+  <select id="findAutoVacuumTargets" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT NULL FROM dual WHERE 1 = 0
+  </select>
+
+  <!-- ── PG AGE (sql_library._SQL_PG_AGE 1:1) ────────────────────────── -->
+  <select id="findAge" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT datname AS dbname,
+           (SELECT to_char(setting::integer,'99,999,999,999') FROM pg_settings WHERE name='autovacuum_freeze_max_age') AS parameter_max_age,
+           to_char(age(datfrozenxid),'9,999,999,999') AS max_age,
+           to_char(txid_current(),'99,999,999,999') AS current_txid
+    FROM pg_database
+    WHERE datname = current_database()
+    ORDER BY age(datfrozenxid) DESC
+  </select>
+
+  <!-- Oracle: age 비지원 → 빈 결과. -->
+  <select id="findAge" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT NULL FROM dual WHERE 1 = 0
+  </select>
+
+  <!-- ── PG TEMP TABLE (sql_library._SQL_PG_TEMP_TABLE 1:1) ─────────── -->
+  <select id="findTempTables" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT schemaname AS "SCHEMA", tablename AS "TEMP TABLE"
+    FROM pg_tables
+    WHERE tablename LIKE 'tt%'
+    ORDER BY 1
+  </select>
+
+  <!-- ── Oracle TEMP TABLE (sql_library._SQL_ORACLE_TEMP_TABLE 1:1) ─── -->
+  <select id="findTempTables" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT USER AS "SCHEMA", table_name AS "TEMP TABLE"
+    FROM user_tables
+    WHERE UPPER(table_name) LIKE 'TT%'
+    ORDER BY table_name
+  </select>
+
+</mapper>
