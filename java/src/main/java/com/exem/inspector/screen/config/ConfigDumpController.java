@@ -13,14 +13,18 @@ import com.exem.inspector.common.web.ApiResponse;
 
 /**
  * Config Dump 라우터 — screen 5. screen 4(config_page) 와 별도 화면 분리(Session 2).
+ *
+ * <p>D-2(Session 5) — /labs/api/config-dump/sql 추가.
  */
 @RestController
 public class ConfigDumpController {
 
     private final ConfigDumpService service;
+    private final SqlDumpService sqlService;
 
-    public ConfigDumpController(ConfigDumpService service) {
+    public ConfigDumpController(ConfigDumpService service, SqlDumpService sqlService) {
         this.service = service;
+        this.sqlService = sqlService;
     }
 
     /** GET /labs/api/config-dump/menus — 5 메뉴 정의 노출. */
@@ -34,6 +38,16 @@ public class ConfigDumpController {
     public ResponseEntity<ApiResponse<ConfigDumpPayload>> dump(@RequestBody(required = false) List<String> menuKeys) {
         try {
             return ResponseEntity.ok(ApiResponse.ok(service.dump(menuKeys)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /** POST /labs/api/config-dump/sql — dump → SQL 텍스트(원본 _generate_sql). */
+    @PostMapping("/labs/api/config-dump/sql")
+    public ResponseEntity<ApiResponse<SqlDumpResult>> sql(@RequestBody(required = false) List<String> menuKeys) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(sqlService.generate(menuKeys)));
         } catch (RuntimeException e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
