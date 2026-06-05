@@ -34,4 +34,7 @@ public interface HistoryMapper {
 
     /** /labs/api/history-tbs 1:1 — INSP_TBS_HISTORY 시계열(start/end timestamp). */
     List<LinkedHashMap<String, Object>> findTbsRange(@Param("start") String start, @Param("end") String end);
+
+    /** /labs/api/history-service 1:1 — INSP_SERVICE_HISTORY 시계열(start/end timestamp). */
+    List<LinkedHashMap<String, Object>> findServiceRange(@Param("start") String start, @Param("end") String end);
 }

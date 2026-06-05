@@ -52,6 +52,20 @@ public class HistoryDetailController {
         }
     }
 
+    /**
+     * {@code GET /labs/api/history-service?date=YYYY-MM-DD}.
+     * 원본 api_history_service 1:1 — date 누락 시 today.
+     */
+    @GetMapping("/labs/api/history-service")
+    public ResponseEntity<ApiResponse<HistoryServicePayload>> serviceStatus(
+            @RequestParam(name = "date", required = false) String date) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(service.service(date)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.error(safeMessage(e)));
+        }
+    }
+
     private static String safeMessage(RuntimeException e) {
         String msg = e.getMessage();
         if (msg == null) {

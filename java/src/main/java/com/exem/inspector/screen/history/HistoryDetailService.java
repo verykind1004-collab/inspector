@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -98,6 +99,59 @@ public class HistoryDetailService {
             }
         }
         return new HistoryTbsPayload(rows, isPgRepo());
+    }
+
+    /**
+     * api_history_service 1:1 — date → svc_map(config 순서 + 매칭된 서비스만).
+     *
+     * <p>config order: DGServer_M (있을 때) → DGServer_S1..n → PlatformJS → Repository DB.
+     * 응답 services 는 그 순서 중 데이터가 있는 항목만(원본 동일).
+     */
+    public HistoryServicePayload service(String dateRaw) {
+        String date = normalizeDate(dateRaw);
+        String start = date + " 00:00:00";
+        String end   = date + " 23:59:59";
+
+        HistoryMapper mapper = mapperProvider.getIfAvailable();
+        Map<String, List<HistoryServiceRow>> svcMap = new java.util.LinkedHashMap<>();
+        if (mapper != null) {
+            List<LinkedHashMap<String, Object>> raw = mapper.findServiceRange(start, end);
+            for (LinkedHashMap<String, Object> r : raw) {
+                String sname = asString(r.get("service_name"));
+                if (sname == null) continue;
+                svcMap.computeIfAbsent(sname, k -> new ArrayList<>())
+                       .add(new HistoryServiceRow(asString(r.get("ts")), asString(r.get("s"))));
+            }
+        }
+        List<String> ordered = configuredServiceNames();
+        List<String> services = new ArrayList<>();
+        Map<String, List<HistoryServiceRow>> filtered = new java.util.LinkedHashMap<>();
+        for (String s : ordered) {
+            if (svcMap.containsKey(s)) {
+                services.add(s);
+                filtered.put(s, svcMap.get(s));
+            }
+        }
+        return new HistoryServicePayload(services, filtered, date);
+    }
+
+    /** 원본 _configured_service_names 1:1. */
+    private List<String> configuredServiceNames() {
+        List<String> names = new ArrayList<>();
+        try {
+            String dgsM = serviceConfig.services().dgserverM();
+            if (dgsM != null && !dgsM.isEmpty()) names.add("DGServer_M");
+            List<String> dgsS = serviceConfig.services().dgserverS();
+            if (dgsS != null) {
+                for (int i = 0; i < dgsS.size(); i++) {
+                    String home = dgsS.get(i);
+                    if (home != null && !home.isEmpty()) names.add("DGServer_S" + (i + 1));
+                }
+            }
+        } catch (RuntimeException ignored) { /* config 누락 시 기본 2 항목만. */ }
+        names.add("PlatformJS");
+        names.add("Repository DB");
+        return names;
     }
 
     private boolean isPgRepo() {

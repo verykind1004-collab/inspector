@@ -15,6 +15,7 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import com.exem.inspector.common.db.RepositoryConfig;
 import com.exem.inspector.config.ServiceConfig;
+import com.exem.inspector.config.ServicesBlock;
 
 /**
  * HistoryDetailService 단위 테스트 — 원본 api_history_os/tbs 응답 shape 1:1.
@@ -37,6 +38,13 @@ class HistoryDetailServiceTest {
         RepositoryConfig repo = mock(RepositoryConfig.class);
         given(repo.dbType()).willReturn("PostgreSQL");
         given(serviceConfig.repository()).willReturn(repo);
+    }
+
+    private void wireServices(String dgsM, java.util.List<String> dgsS) {
+        ServicesBlock sb = mock(ServicesBlock.class);
+        given(sb.dgserverM()).willReturn(dgsM);
+        given(sb.dgserverS()).willReturn(dgsS);
+        given(serviceConfig.services()).willReturn(sb);
     }
 
     private LinkedHashMap<String, Object> osRow(String ts,
@@ -233,5 +241,59 @@ class HistoryDetailServiceTest {
         HistoryTbsPayload p = service.tbs("2026-06-01", "2026-06-04");
 
         assertThat(p.isPg()).isTrue();
+    }
+
+    // ── api_history_service ───────────────────────────────────────────
+
+    private LinkedHashMap<String, Object> svcRow(String ts, String name, String status) {
+        LinkedHashMap<String, Object> r = new LinkedHashMap<>();
+        r.put("ts", ts);
+        r.put("service_name", name);
+        r.put("s", status);
+        return r;
+    }
+
+    @Test
+    void service_filtersByConfigOrder_dgserverM_Sn_PlatformJS_Repo() {
+        wireServices("/home/inspector/dgs_m", Arrays.asList("/home/inspector/dgs_s1", "/home/inspector/dgs_s2"));
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findServiceRange(anyString(), anyString())).willReturn(Arrays.asList(
+                svcRow("2026-06-05 00:00:00", "DGServer_M",    "RUNNING"),
+                svcRow("2026-06-05 00:00:00", "DGServer_S1",   "RUNNING"),
+                svcRow("2026-06-05 00:00:00", "PlatformJS",    "RUNNING"),
+                svcRow("2026-06-05 00:00:00", "Repository DB", "RUNNING"),
+                svcRow("2026-06-05 00:00:00", "UnknownSvc",    "STOPPED")));
+
+        HistoryServicePayload p = service.service("2026-06-05");
+
+        // services 는 config 순서대로 + UnknownSvc 제외 (S2는 데이터 없어서 제외)
+        assertThat(p.getServices()).containsExactly("DGServer_M", "DGServer_S1", "PlatformJS", "Repository DB");
+        assertThat(p.getData()).containsOnlyKeys("DGServer_M", "DGServer_S1", "PlatformJS", "Repository DB");
+        assertThat(p.getData().get("DGServer_M")).hasSize(1);
+        assertThat(p.getDate()).isEqualTo("2026-06-05");
+    }
+
+    @Test
+    void service_emptyDgserverM_skipsIt() {
+        wireServices("", Collections.emptyList());
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findServiceRange(anyString(), anyString())).willReturn(Arrays.asList(
+                svcRow("2026-06-05 00:00:00", "DGServer_M", "RUNNING"),
+                svcRow("2026-06-05 00:00:00", "PlatformJS", "RUNNING")));
+
+        HistoryServicePayload p = service.service("2026-06-05");
+
+        // DGServer_M 은 config 빈 값이라 ordered 명단에서 제외 → 응답에 안 포함됨
+        assertThat(p.getServices()).containsExactly("PlatformJS");
+    }
+
+    @Test
+    void service_normalizesBadDate_toToday() {
+        wireServices("", Collections.emptyList());
+        given(mapperProvider.getIfAvailable()).willReturn(null);
+
+        HistoryServicePayload p = service.service("invalid");
+
+        assertThat(p.getDate()).matches("\\d{4}-\\d{2}-\\d{2}");
     }
 }
