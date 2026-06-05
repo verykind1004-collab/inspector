@@ -13,15 +13,31 @@ import java.util.LinkedHashMap;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import com.exem.inspector.common.db.RepositoryConfig;
+import com.exem.inspector.config.ServiceConfig;
+
 /**
- * HistoryDetailService 단위 테스트 — 원본 api_history_os 응답 shape 1:1.
+ * HistoryDetailService 단위 테스트 — 원본 api_history_os/tbs 응답 shape 1:1.
  */
 class HistoryDetailServiceTest {
 
     @SuppressWarnings("unchecked")
     private final ObjectProvider<HistoryMapper> mapperProvider = mock(ObjectProvider.class);
     private final HistoryMapper mapper = mock(HistoryMapper.class);
-    private final HistoryDetailService service = new HistoryDetailService(mapperProvider);
+    private final ServiceConfig serviceConfig = mock(ServiceConfig.class);
+    private final HistoryDetailService service = new HistoryDetailService(mapperProvider, serviceConfig);
+
+    private void wireRepoOracle() {
+        RepositoryConfig repo = mock(RepositoryConfig.class);
+        given(repo.dbType()).willReturn("Oracle");
+        given(serviceConfig.repository()).willReturn(repo);
+    }
+
+    private void wireRepoPg() {
+        RepositoryConfig repo = mock(RepositoryConfig.class);
+        given(repo.dbType()).willReturn("PostgreSQL");
+        given(serviceConfig.repository()).willReturn(repo);
+    }
 
     private LinkedHashMap<String, Object> osRow(String ts,
                                                  Double cpuPct, Double cpuUser, Double cpuSys, Double cpuIo,
@@ -153,5 +169,69 @@ class HistoryDetailServiceTest {
         assertThat(HistoryDetailService.normalizeTime("9:30",   "00:00")).isEqualTo("00:00");
         assertThat(HistoryDetailService.normalizeTime("0930",   "00:00")).isEqualTo("00:00");
         assertThat(HistoryDetailService.normalizeTime("ab:cd",  "00:00")).isEqualTo("00:00");
+    }
+
+    // ── api_history_tbs ─────────────────────────────────────────────
+
+    private LinkedHashMap<String, Object> tbsRow(String ts, String name,
+                                                  Double used, Double total, Double free, Double pct, String status) {
+        LinkedHashMap<String, Object> r = new LinkedHashMap<>();
+        r.put("ts", ts); r.put("name", name);
+        r.put("used", used); r.put("total", total); r.put("free", free);
+        r.put("pct", pct); r.put("status", status);
+        return r;
+    }
+
+    @Test
+    void tbs_returnsRows_withOriginalKeys() {
+        wireRepoOracle();
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findTbsRange(anyString(), anyString())).willReturn(Arrays.asList(
+                tbsRow("2026-06-04 23:50:00", "SYSTEM", 12.5, 30.0, 17.5, 41.67, "OK"),
+                tbsRow("2026-06-04 23:50:00", "USERS",  85.0, 100.0, 15.0, 85.00, "WARN"),
+                tbsRow("2026-06-04 23:50:00", "TEMP",   91.0, 100.0,  9.0, 91.00, "CHECK")));
+
+        HistoryTbsPayload p = service.tbs("2026-06-01", "2026-06-04");
+
+        assertThat(p.getData()).hasSize(3);
+        HistoryTbsRow r1 = p.getData().get(1);
+        assertThat(r1.getName()).isEqualTo("USERS");
+        assertThat(r1.getPct()).isEqualTo(85.00);
+        assertThat(r1.getStatus()).isEqualTo("WARN");
+        assertThat(p.isPg()).isFalse();
+    }
+
+    @Test
+    void tbs_emptyToDate_usesFromDate() {
+        wireRepoOracle();
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findTbsRange("2026-06-01 00:00:00", "2026-06-01 23:59:59"))
+                .willReturn(Collections.singletonList(
+                        tbsRow("2026-06-01 23:50:00", "SYSTEM", 1.0, 10.0, 9.0, 10.0, "OK")));
+
+        HistoryTbsPayload p = service.tbs("2026-06-01", null);
+
+        assertThat(p.getData()).hasSize(1);
+        assertThat(p.getData().get(0).getName()).isEqualTo("SYSTEM");
+    }
+
+    @Test
+    void tbs_emptyWhenMapperNull() {
+        wireRepoOracle();
+        given(mapperProvider.getIfAvailable()).willReturn(null);
+
+        HistoryTbsPayload p = service.tbs("2026-06-01", "2026-06-04");
+
+        assertThat(p.getData()).isEmpty();
+    }
+
+    @Test
+    void tbs_isPg_truePg_falseOracle() {
+        wireRepoPg();
+        given(mapperProvider.getIfAvailable()).willReturn(null);
+
+        HistoryTbsPayload p = service.tbs("2026-06-01", "2026-06-04");
+
+        assertThat(p.isPg()).isTrue();
     }
 }

@@ -31,4 +31,7 @@ public interface HistoryMapper {
 
     /** /labs/api/history-os 1:1 — INSP_OS_HISTORY 시계열(start/end timestamp). */
     List<LinkedHashMap<String, Object>> findOsRange(@Param("start") String start, @Param("end") String end);
+
+    /** /labs/api/history-tbs 1:1 — INSP_TBS_HISTORY 시계열(start/end timestamp). */
+    List<LinkedHashMap<String, Object>> findTbsRange(@Param("start") String start, @Param("end") String end);
 }

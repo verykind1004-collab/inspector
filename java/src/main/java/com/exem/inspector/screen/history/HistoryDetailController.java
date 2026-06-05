@@ -37,6 +37,21 @@ public class HistoryDetailController {
         }
     }
 
+    /**
+     * {@code GET /labs/api/history-tbs?from_date=YYYY-MM-DD&to_date=YYYY-MM-DD}.
+     * 원본 api_history_tbs 1:1 — to_date 누락 시 from_date 와 동일.
+     */
+    @GetMapping("/labs/api/history-tbs")
+    public ResponseEntity<ApiResponse<HistoryTbsPayload>> tbs(
+            @RequestParam(name = "from_date", required = false) String fromDate,
+            @RequestParam(name = "to_date",   required = false) String toDate) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(service.tbs(fromDate, toDate)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.error(safeMessage(e)));
+        }
+    }
+
     private static String safeMessage(RuntimeException e) {
         String msg = e.getMessage();
         if (msg == null) {

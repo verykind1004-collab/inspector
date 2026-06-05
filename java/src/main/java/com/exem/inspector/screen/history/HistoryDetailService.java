@@ -10,6 +10,9 @@ import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import com.exem.inspector.common.db.DbType;
+import com.exem.inspector.config.ServiceConfig;
+
 /**
  * Inspector History 상세 화면 — OS(CPU/Memory) 등 페이지별 차트 데이터.
  *
@@ -22,9 +25,11 @@ public class HistoryDetailService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final ObjectProvider<HistoryMapper> mapperProvider;
+    private final ServiceConfig serviceConfig;
 
-    public HistoryDetailService(ObjectProvider<HistoryMapper> mapperProvider) {
+    public HistoryDetailService(ObjectProvider<HistoryMapper> mapperProvider, ServiceConfig serviceConfig) {
         this.mapperProvider = mapperProvider;
+        this.serviceConfig = serviceConfig;
     }
 
     /**
@@ -60,6 +65,48 @@ public class HistoryDetailService {
             }
         }
         return new HistoryOsPayload(rows, date, from, to);
+    }
+
+    /**
+     * api_history_tbs 1:1 — from_date + to_date (둘 다 YYYY-MM-DD) → 시계열 rows.
+     *
+     * <p>to_date 미지정 시 from_date 와 동일(원본 default), date 잘못된 경우 today.
+     * 같은 날 두 번 받을 수도 있으므로 to < from 보정 없이 원본 동일하게 그대로 처리.
+     */
+    public HistoryTbsPayload tbs(String fromDateRaw, String toDateRaw) {
+        String fromDate = normalizeDate(fromDateRaw);
+        String toDate   = normalizeDate(toDateRaw == null || toDateRaw.isEmpty() ? fromDate : toDateRaw);
+        String start = fromDate + " 00:00:00";
+        String end   = toDate   + " 23:59:59";
+
+        HistoryMapper mapper = mapperProvider.getIfAvailable();
+        List<HistoryTbsRow> rows;
+        if (mapper == null) {
+            rows = Collections.emptyList();
+        } else {
+            List<LinkedHashMap<String, Object>> raw = mapper.findTbsRange(start, end);
+            rows = new ArrayList<>(raw.size());
+            for (LinkedHashMap<String, Object> r : raw) {
+                rows.add(new HistoryTbsRow(
+                        asString(r.get("ts")),
+                        asString(r.get("name")),
+                        asDouble(r.get("used")),
+                        asDouble(r.get("total")),
+                        asDouble(r.get("free")),
+                        asDouble(r.get("pct")),
+                        asString(r.get("status"))));
+            }
+        }
+        return new HistoryTbsPayload(rows, isPgRepo());
+    }
+
+    private boolean isPgRepo() {
+        try {
+            DbType t = DbType.fromConfigValue(serviceConfig.repository().dbType());
+            return t == DbType.POSTGRESQL;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────

@@ -160,4 +160,33 @@
      ORDER BY collected_at
   </select>
 
+  <!-- ── 페이지별 차트용(history_views.py::api_history_tbs) — start/end 시각 범위 ─ -->
+  <select id="findTbsRange" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "ts",
+           tbs_name     AS "name",
+           used_gb      AS "used",
+           total_gb     AS "total",
+           free_gb      AS "free",
+           used_percent AS "pct",
+           status       AS "status"
+      FROM INSP_TBS_HISTORY
+     WHERE collected_at &gt;= TO_TIMESTAMP(#{start}, 'YYYY-MM-DD HH24:MI:SS')
+       AND collected_at &lt;= TO_TIMESTAMP(#{end},   'YYYY-MM-DD HH24:MI:SS')
+     ORDER BY collected_at, tbs_name
+  </select>
+
+  <select id="findTbsRange" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "ts",
+           tbs_name     AS "name",
+           used_gb      AS "used",
+           total_gb     AS "total",
+           free_gb      AS "free",
+           used_percent AS "pct",
+           status       AS "status"
+      FROM insp_tbs_history
+     WHERE collected_at &gt;= to_timestamp(#{start}, 'YYYY-MM-DD HH24:MI:SS')
+       AND collected_at &lt;= to_timestamp(#{end},   'YYYY-MM-DD HH24:MI:SS')
+     ORDER BY collected_at, tbs_name
+  </select>
+
 </mapper>
