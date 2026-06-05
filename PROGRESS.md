@@ -11,6 +11,34 @@
 
 
 
+## 세션 2026-06-05 후속 (Task #3 정밀 비교 + Task #4 일부 + Task #5 결정)
+
+**완료 (BE/FE 12 commits)**:
+- Task #1 Alert COUNT 셀 툴팁: BE 814c923 + FE a9c6463
+- Task #2 Process Gather/Param: BE 73f26df + FE 66789ca + FE c318e6f
+- Task #3 License Check + Alarm History 정밀 비교: FE fa6074e + FE 3b2c0e0
+- Task #3 Report License 카드 복원: BE bd1c7ed + FE a5e5653 (직전 세션이 임의로 Instances 로 교체 → 원본 1:1 복원)
+- Task #4 /services 페이지 신설: BE 826198a + FE 75989a0 (uptime + PID 추적 추가)
+- Task #5 임의 추가물 결정: 사용자 명시 — script_manager/decrypt/control-process/alert-config.{api,mail,sms}/config/alarm-history/단축 alias **모두 유지**
+
+**검증 누적**:
+- BE: 326 tests PASS (직전 294 → +32: alert 7 + obsd 5 + log-server 9 + uptime 6 + pid 4 + Report 변경 1)
+- FE: 104 tests PASS (직전 99 → +5: AlertPage 3, ProcessGather +1, ServicesPage 3, ProcessParam 4 정합)
+- Lint 0 errors / FE build SUCCESS / Live BE 검증 PASS (alert-times, process/gather/obsd, process/gather/log-server, overview/services uptime)
+
+**남은 작업 (다음 세션 — 큰 분량)**:
+1. **Task #2 Modify 패널** — dgxml_modify.py modify_panel_html 풀 구현 (현재 disabled placeholder)
+2. **Task #4 ConfigDump 페이지 전체 재작성** — 원본 DUMP_PROFILES 카드 패러다임 vs 현재 React 메뉴 picker (886 → 124 줄 차이)
+3. **Task #4 History 6 페이지 정밀 비교** — history_page.py 1328 줄 + history_views.py 2295 줄 vs 현재 React HistoryPage 141 줄. 6 페이지 각각 (os/cpu, os/memory, disk/tbs, process/{status,qcnt,heap}) 정밀 비교 + 누락 복원
+
+**원본 사이드바 미노출 그러나 정본 라우트**:
+- /services (신설 완료)
+- /report (License 카드 복원 완료, 12개월 표/STATUS_GROUPS 임의 추가물 검토 필요)
+- /config-dump (UI 패러다임 다름 — 재작성 필요)
+- /history/{os/cpu, os/memory, disk/tbs, process/{status,qcnt,heap}, configuration} (6 페이지 정밀 비교 필요)
+
+
+
 ## 세션 2026-06-04~05 (Alert tooltip + Process Gather/Param 완성)
 
 **작업 분기** (handoff [[inspector_rewrite_principle]] 절대 원칙):
