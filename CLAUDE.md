@@ -12,7 +12,7 @@
   - Oracle: `/home/inspector/ORACLE/2604/Inspector/python-utils/sql_library.py` 등(2407/2506/2604 동일)
   - PG    : `/home/inspector/PG/2604/Labs/Inspector/python-utils/sql_library.py`
   - 기타 모듈(`db_utils.py`, `system_utils.py`, `auth.py`, `pages/*.py`): 동일 정식 트리(2604) 기준
-  - `release/inspector/Labs/` 의 변형 트리는 **참조 명세에서 폐기**(2026-06-02 정정). 정식 2604 사본을 git 트리에 두는 방안은 별도 ADR 검토.
+  - `release/inspector/Labs/` 의 변형 트리는 **삭제 완료(2026-06-05)**. SSOT 는 `/home/inspector/PG/2604/Labs/`. 정식 2604 사본을 git 트리에 두는 방안은 별도 ADR 검토.
 - 부차 목적: 보안 취약점 개선(SHA256 → 강한 알고리즘 등) + 기존 MaxGauge 제품과 스택 통일(백엔드 Java, 프론트는 MaxGauge VI 표준)
 - 신규 코드: 백엔드 `java/`(Spring Boot REST API) + 프론트(React SPA, 별도 레포). 정식 2604 트리는 참조만.
 - 백엔드 개발은 반드시 이 서버에서 수행한다 (MaxGauge 연동 필수). 프론트는 API 모킹(MSW)으로 분리 개발 가능.

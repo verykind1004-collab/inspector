@@ -5,7 +5,7 @@
 
 **지원 버전 = MaxGauge 2407 ~ 2604 및 이후** (2311 제외). 2407 = 2506 = 2604 SQL 동일이라 단일 SQL 셋으로 커버.
 
-**포팅 SSOT = 정식 2604 라인**: `/home/inspector/ORACLE/2604/Inspector/python-utils/` + `/home/inspector/PG/2604/Labs/Inspector/python-utils/`. 이전에 베이스로 삼았던 `release/inspector/Labs/` 의 Labs 변형(2311+패치)은 폐기(2026-06-02 정정).
+**포팅 SSOT = 정식 2604 라인**: `/home/inspector/ORACLE/2604/Inspector/python-utils/` + `/home/inspector/PG/2604/Labs/Inspector/python-utils/`. 이전에 베이스로 삼았던 `release/inspector/Labs/` 의 Labs 변형(2311+패치)은 폐기 + **삭제 완료(2026-06-05)**.
 
 이전 "확장 플랫폼" 도그마는 폐기(2026-06-02). 공통화(표준 JSON·2층 컴포넌트)는 기존 화면을 일관 처리하기 위한 **품질 원칙**이며 신규 화면 정당화 수단이 아니다.
 
