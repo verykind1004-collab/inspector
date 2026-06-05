@@ -2,6 +2,7 @@ package com.exem.inspector.screen.config;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,22 +13,25 @@ import org.springframework.web.bind.annotation.RestController;
 import com.exem.inspector.common.web.ApiResponse;
 
 /**
- * Config Dump 라우터 — screen 5. screen 4(config_page) 와 별도 화면 분리(Session 2).
+ * Config Dump / Restore 라우터 — 원본 config_dump.py 의 page_config_dump 화면용.
  *
- * <p>D-2(Session 5) — /labs/api/config-dump/sql 추가.
+ * <p>원본 화면은 Dump (2 profile cards) + Restore + Migration Guide 3-카드 구성.
+ * - GET  /labs/api/config-dump/menus   : MENU_DEFS 노출 (tooltip 상세 데이터).
+ * - POST /labs/api/config-dump         : 메뉴 선택 → dump 결과(JSON+SQL 문자열) 반환.
+ * - POST /labs/api/config-restore      : 업로드된 dump 데이터로 restore.
  */
 @RestController
 public class ConfigDumpController {
 
     private final ConfigDumpService service;
-    private final SqlDumpService sqlService;
+    private final ConfigRestoreService restoreService;
 
-    public ConfigDumpController(ConfigDumpService service, SqlDumpService sqlService) {
+    public ConfigDumpController(ConfigDumpService service, ConfigRestoreService restoreService) {
         this.service = service;
-        this.sqlService = sqlService;
+        this.restoreService = restoreService;
     }
 
-    /** GET /labs/api/config-dump/menus — 5 메뉴 정의 노출. */
+    /** GET /labs/api/config-dump/menus — 5 메뉴 정의 노출(tooltip 상세 데이터). */
     @GetMapping("/labs/api/config-dump/menus")
     public ResponseEntity<ApiResponse<Collection<ConfigDumpMenu>>> menus() {
         return ResponseEntity.ok(ApiResponse.ok(service.menus()));
@@ -43,11 +47,11 @@ public class ConfigDumpController {
         }
     }
 
-    /** POST /labs/api/config-dump/sql — dump → SQL 텍스트(원본 _generate_sql). */
-    @PostMapping("/labs/api/config-dump/sql")
-    public ResponseEntity<ApiResponse<SqlDumpResult>> sql(@RequestBody(required = false) List<String> menuKeys) {
+    /** POST /labs/api/config-restore — 업로드된 dump JSON 으로 Repository 복원. */
+    @PostMapping("/labs/api/config-restore")
+    public ResponseEntity<ApiResponse<RestoreResult>> restore(@RequestBody Map<String, Object> dumpData) {
         try {
-            return ResponseEntity.ok(ApiResponse.ok(sqlService.generate(menuKeys)));
+            return ResponseEntity.ok(ApiResponse.ok(restoreService.restore(dumpData)));
         } catch (RuntimeException e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
