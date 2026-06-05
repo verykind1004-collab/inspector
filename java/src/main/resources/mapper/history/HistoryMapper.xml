@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  원본 pages/history.py 의 6 view (OS/TBS/Service/Heap/QCnt/Summary). 본 단계는 핵심 컬럼 + 최근 days 일.
+  원본 pages/history.py 의 6 view (OS/TBS/Service/Heap/QCnt/Summary) + history_views.py 의 차트용 범위 조회.
   컬럼 alias 는 원본 INSP_* 테이블 그대로(소문자). Session 2 보강: HEAP view 추가 (INSP_HEAP_HISTORY).
 -->
 <mapper namespace="com.exem.inspector.screen.history.HistoryMapper">
@@ -125,6 +125,39 @@
      WHERE collected_at &gt;= NOW() - (#{days} || ' days')::interval
      ORDER BY collected_at DESC
      LIMIT #{limit}
+  </select>
+
+  <!-- ── 페이지별 차트용(history_views.py::api_history_os) — start/end 시각 범위 ─ -->
+  <select id="findOsRange" resultType="java.util.LinkedHashMap" databaseId="oracle">
+    SELECT TO_CHAR(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "ts",
+           cpu_percent  AS "cpu_pct",
+           cpu_user     AS "cpu_user",
+           cpu_system   AS "cpu_sys",
+           cpu_iowait   AS "cpu_io",
+           mem_total_gb AS "mem_total",
+           mem_used_gb  AS "mem_used",
+           mem_free_gb  AS "mem_free",
+           mem_percent  AS "mem_pct"
+      FROM INSP_OS_HISTORY
+     WHERE collected_at &gt;= TO_TIMESTAMP(#{start}, 'YYYY-MM-DD HH24:MI:SS')
+       AND collected_at &lt;= TO_TIMESTAMP(#{end},   'YYYY-MM-DD HH24:MI:SS')
+     ORDER BY collected_at
+  </select>
+
+  <select id="findOsRange" resultType="java.util.LinkedHashMap" databaseId="postgresql">
+    SELECT to_char(collected_at, 'YYYY-MM-DD HH24:MI:SS') AS "ts",
+           cpu_percent  AS "cpu_pct",
+           cpu_user     AS "cpu_user",
+           cpu_system   AS "cpu_sys",
+           cpu_iowait   AS "cpu_io",
+           mem_total_gb AS "mem_total",
+           mem_used_gb  AS "mem_used",
+           mem_free_gb  AS "mem_free",
+           mem_percent  AS "mem_pct"
+      FROM insp_os_history
+     WHERE collected_at &gt;= to_timestamp(#{start}, 'YYYY-MM-DD HH24:MI:SS')
+       AND collected_at &lt;= to_timestamp(#{end},   'YYYY-MM-DD HH24:MI:SS')
+     ORDER BY collected_at
   </select>
 
 </mapper>
