@@ -439,3 +439,47 @@
 **남은 작업 (다음 세션 — 큰 분량 1건)**:
 1. **Task #4 History 6 페이지 정밀 비교** — history_page.py 1328줄 + history_views.py 2295줄 → 현재 React HistoryPage.tsx 141줄. 6 페이지(/history/{os/cpu, os/memory, disk/tbs, process/{status,qcnt,heap}, configuration}) 각각 정밀 비교 + 누락 복원. 차트/필터/시계열 데이터 등 미구현 가능성 큼.
 
+
+
+
+## 세션 2026-06-05 후속2 (Task #4 History 7 페이지 완료)
+
+**완료 (BE/FE 12 commits)**:
+
+### BE — 5 commits (HistoryDetailService 신규)
+- ac51b36 feat(history/cpu): /labs/api/history-os + HistoryDetailService — date+from+to → OS 시계열
+- 91ee15d feat(history/tbs): /labs/api/history-tbs + isPg 분기 — daily bar chart 데이터
+- b04bc72 feat(history/process-status): /labs/api/history-service + config 순서 필터 (DGServer_M/Sn/PlatformJS/Repository DB)
+- b5bfc96 feat(history/qcnt): /labs/api/history-qcnt — service 별 qcnt 시계열
+- 00a306c feat(history/heap): /labs/api/history-heap — service 별 heap used/alloc/max 시계열
+
+### FE — 7 commits (페이지 7개 신규)
+- eff1064 feat(history/cpu): /history/os/cpu — Canvas stacked area (Sys/User/IO) + drag-zoom + Legend toggle
+- c8de510 feat(history/memory): /history/os/memory — Canvas Used GB area + yTop 자동
+- 8c26024 feat(history/tbs): /history/disk/tbs — daily bar chart + Oracle(Tablespace)/PG(Disk) 분기 + 31일 max
+- 1c70674 feat(history/process-status): /history/process/status — 24-hour heatmap (RUNNING/STOPPED) + Yesterday/Today
+- 60a8f51 feat(history/qcnt): /history/process/qcnt — per-service qcnt trend + crosshair cross-sync + drag-zoom
+- c9baef3 feat(history/heap): /history/process/heap — per-service heap(used+dashed alloc) + cross-sync
+- 7070715 feat(history/config): /history/configuration — 3 카드 (Init/Settings/Schedule), settings save 정상 동작
+
+### 신규 디렉토리
+- BE: java/src/main/java/com/exem/inspector/screen/history/ (HistoryDetailService/Controller + 5 Payload + 5 Row POJO)
+- FE: src/features/{history-os,history-tbs,history-svc,history-qcnt,history-heap} — 페이지별 useHistory* hook
+- FE: src/pages/history/components/{CpuStackedAreaChart, MemoryAreaChart, TbsBarChart, ServiceHeatmap, QcntTrendChart, HeapTrendChart}
+
+### 원본 1:1 차트 (color/layout/interaction 모두 보존)
+- 색상: CPU IO=#F59E0B / User=#22C55E / Sys=#6366F1 — Memory=#8B5CF6 — TBS pct≥90 red/≥80 amber/else indigo — Service RUNNING=#3ecf82/STOPPED=#e05555 — Qcnt 8-palette / Heap 8-palette
+- 인터랙션: crosshair + drag-to-zoom + dblclick reset + Legend series toggle (CPU) + tooltip
+- Qcnt/Heap: 차트 간 crosshair sync (한 차트 hover → 다른 차트 동기)
+
+**검증 누적 (이번 세션 마감 시점)**:
+- BE: **347 tests PASS** (직전 327 → +20: OS 9 + TBS 4 + Service 3 + Qcnt 2 + Heap 2)
+- FE: **148 tests PASS** (직전 109 → +39: CPU 6 + Memory 6 + TBS 6 + Status 5 + Qcnt 5 + Heap 5 + Config 6)
+- Lint 0 errors / FE build SUCCESS (4.8s) / BE build SUCCESS
+
+**남은 작업 — Card 1/3 Inspector Python DDL 이식 (별도 작업)**:
+- /history/configuration Card 1 (Create/Drop Tables 버튼) — insp_pg/insp_oracle DDL 의 Java 이식 필요
+- /history/configuration Card 3 (Schedule status 의 OK/Create 버튼) — 동일
+
+**검토 보류 (사용자 결정 필요, 이전 세션과 동일 유지)**:
+- Report 페이지 임의 추가물(고객사명/지원제품 contentEditable + Check Resource 12개월표 + STATUS_GROUPS 4그룹)
