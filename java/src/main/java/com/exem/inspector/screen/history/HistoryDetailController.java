@@ -66,6 +66,22 @@ public class HistoryDetailController {
         }
     }
 
+    /**
+     * {@code GET /labs/api/history-qcnt?date=YYYY-MM-DD&from=HH:MM&to=HH:MM}.
+     * 원본 api_history_qcnt 1:1.
+     */
+    @GetMapping("/labs/api/history-qcnt")
+    public ResponseEntity<ApiResponse<HistoryQcntPayload>> qcnt(
+            @RequestParam(name = "date", required = false) String date,
+            @RequestParam(name = "from", required = false) String from,
+            @RequestParam(name = "to",   required = false) String to) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(service.qcnt(date, from, to)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.error(safeMessage(e)));
+        }
+    }
+
     private static String safeMessage(RuntimeException e) {
         String msg = e.getMessage();
         if (msg == null) {

@@ -135,6 +135,39 @@ public class HistoryDetailService {
         return new HistoryServicePayload(services, filtered, date);
     }
 
+    /**
+     * api_history_qcnt 1:1 — date + from + to → svc_map(서비스명 정렬).
+     */
+    public HistoryQcntPayload qcnt(String dateRaw, String fromRaw, String toRaw) {
+        String date = normalizeDate(dateRaw);
+        String from = normalizeTime(fromRaw, "00:00");
+        String to   = normalizeTime(toRaw,   "23:59");
+        String start = date + " " + from + ":00";
+        String end   = date + " " + to   + ":59";
+
+        HistoryMapper mapper = mapperProvider.getIfAvailable();
+        Map<String, List<HistoryQcntRow>> svcMap = new java.util.LinkedHashMap<>();
+        if (mapper != null) {
+            List<LinkedHashMap<String, Object>> raw = mapper.findQcntRange(start, end);
+            for (LinkedHashMap<String, Object> r : raw) {
+                String sname = asString(r.get("service_name"));
+                if (sname == null) continue;
+                svcMap.computeIfAbsent(sname, k -> new ArrayList<>())
+                       .add(new HistoryQcntRow(
+                               asString(r.get("ts")),
+                               asDouble(r.get("act")),
+                               asDouble(r.get("total")),
+                               asDouble(r.get("max")),
+                               asDouble(r.get("qcnt"))));
+            }
+        }
+        List<String> services = new ArrayList<>(svcMap.keySet());
+        Collections.sort(services);
+        Map<String, List<HistoryQcntRow>> ordered = new java.util.LinkedHashMap<>();
+        for (String s : services) ordered.put(s, svcMap.get(s));
+        return new HistoryQcntPayload(services, ordered, date);
+    }
+
     /** 원본 _configured_service_names 1:1. */
     private List<String> configuredServiceNames() {
         List<String> names = new ArrayList<>();

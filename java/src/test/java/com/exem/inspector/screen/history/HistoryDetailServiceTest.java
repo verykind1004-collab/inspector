@@ -296,4 +296,42 @@ class HistoryDetailServiceTest {
 
         assertThat(p.getDate()).matches("\\d{4}-\\d{2}-\\d{2}");
     }
+
+    // ── api_history_qcnt ──────────────────────────────────────────────
+
+    private LinkedHashMap<String, Object> qcntRow(String ts, String svc,
+                                                   Double act, Double total, Double max, Double qcnt) {
+        LinkedHashMap<String, Object> r = new LinkedHashMap<>();
+        r.put("ts", ts); r.put("service_name", svc);
+        r.put("act", act); r.put("total", total);
+        r.put("max", max); r.put("qcnt", qcnt);
+        return r;
+    }
+
+    @Test
+    void qcnt_groupedByService_sortedAlphabetically() {
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findQcntRange(anyString(), anyString())).willReturn(Arrays.asList(
+                qcntRow("2026-06-05 09:00:00", "DGServer_S1", 1.0, 5.0, 10.0, 12.0),
+                qcntRow("2026-06-05 09:00:00", "DGServer_M",  2.0, 6.0, 10.0, 15.0),
+                qcntRow("2026-06-05 09:01:00", "DGServer_M",  3.0, 6.0, 10.0, 20.0)));
+
+        HistoryQcntPayload p = service.qcnt("2026-06-05", "00:00", "23:59");
+
+        // alphabetic order — DGServer_M before DGServer_S1
+        assertThat(p.getServices()).containsExactly("DGServer_M", "DGServer_S1");
+        assertThat(p.getData().get("DGServer_M")).hasSize(2);
+        assertThat(p.getData().get("DGServer_S1")).hasSize(1);
+        assertThat(p.getDate()).isEqualTo("2026-06-05");
+    }
+
+    @Test
+    void qcnt_emptyWhenMapperNull() {
+        given(mapperProvider.getIfAvailable()).willReturn(null);
+
+        HistoryQcntPayload p = service.qcnt("2026-06-05", "00:00", "23:59");
+
+        assertThat(p.getServices()).isEmpty();
+        assertThat(p.getData()).isEmpty();
+    }
 }
