@@ -11,6 +11,35 @@
 
 
 
+## 세션 2026-06-05 추가 (Task #2 Modify Panel 완성)
+
+**완료 (FE 1 commit)**:
+- Task #2 미결: Modify Parameter 모달 풀 구현 — FE 3adf0ac
+  - 원본 dgxml_modify.py::modify_panel_html (line 59) 1:1
+  - ModifyPanel 컴포넌트(src/pages/process-param/components/) — 자동완성 검색 + 다중 DG 일괄 적용 + Save
+  - ProcessParamPage Modify 버튼 활성화(Search 탭)
+  - BE 변경 없음 — useDgxmlParse/Search/Save 기존 hook 재사용
+
+**검증 누적 (이번 세션 마감 시점)**:
+- BE: 326 tests PASS (변경 없음)
+- FE: **109 tests PASS** (직전 104 → +5: ModifyPanel 5)
+- Lint 0 errors / FE build SUCCESS (4.42s, 748KB JS)
+
+**남은 작업 (다음 세션 — 큰 분량 2건)**:
+1. **Task #4 ConfigDump 페이지 전체 재작성** — 원본 886줄 DUMP_PROFILES 카드 패러다임 (호버 툴팁 상세 + Dump 버튼 1개) vs 현재 React 124줄 메뉴 picker. UI 패러다임 자체가 다름.
+2. **Task #4 History 6 페이지 정밀 비교** — history_page.py 1328줄 + history_views.py 2295줄 → 현재 React HistoryPage.tsx 141줄. 6 페이지 각각 () 정밀 비교 + 누락 복원. 차트/필터/시계열 데이터 등 미구현 가능성 큼.
+
+**검토 보류** (사용자 결정 필요):
+- Report 페이지 임의 추가물 (Task #4 의 일부) — 원본 page_report에 없는 **고객사명/지원제품 contentEditable + Check Resource 12개월 표 + STATUS_GROUPS 4그룹**. 1:1 원칙대로면 제거 대상이나 사용자가 별도 기능들 굳이 삭제 안 해도라고 답한 정신 적용 가능.
+
+**Task #5 결정 완료** (사용자 명시 — 모두 유지):
+- script_manager / decrypt / control-process / alert-config.{api,mail,sms} — 원본 page 함수 없으나 사이드바 별도 버튼 기능으로 인정
+- config — 원본 page_config 함수 있음 (라우터 미등록이지만 유지)
+- capacity / temp_table / top_segment / vacuum / age — 정본 /disk/* 로 redirect alias
+- alarm-history — 정본 /history/alarm 로 redirect alias
+
+
+
 ## 세션 2026-06-05 후속 (Task #3 정밀 비교 + Task #4 일부 + Task #5 결정)
 
 **완료 (BE/FE 12 commits)**:
