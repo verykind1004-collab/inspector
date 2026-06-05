@@ -168,6 +168,38 @@ public class HistoryDetailService {
         return new HistoryQcntPayload(services, ordered, date);
     }
 
+    /**
+     * api_history_heap 1:1 — date + from + to → svc_map(서비스명 정렬).
+     */
+    public HistoryHeapPayload heap(String dateRaw, String fromRaw, String toRaw) {
+        String date = normalizeDate(dateRaw);
+        String from = normalizeTime(fromRaw, "00:00");
+        String to   = normalizeTime(toRaw,   "23:59");
+        String start = date + " " + from + ":00";
+        String end   = date + " " + to   + ":59";
+
+        HistoryMapper mapper = mapperProvider.getIfAvailable();
+        Map<String, List<HistoryHeapRow>> svcMap = new java.util.LinkedHashMap<>();
+        if (mapper != null) {
+            List<LinkedHashMap<String, Object>> raw = mapper.findHeapRange(start, end);
+            for (LinkedHashMap<String, Object> r : raw) {
+                String sname = asString(r.get("service_name"));
+                if (sname == null) continue;
+                svcMap.computeIfAbsent(sname, k -> new ArrayList<>())
+                       .add(new HistoryHeapRow(
+                               asString(r.get("ts")),
+                               asDouble(r.get("used")),
+                               asDouble(r.get("alloc")),
+                               asDouble(r.get("max"))));
+            }
+        }
+        List<String> services = new ArrayList<>(svcMap.keySet());
+        Collections.sort(services);
+        Map<String, List<HistoryHeapRow>> ordered = new java.util.LinkedHashMap<>();
+        for (String s : services) ordered.put(s, svcMap.get(s));
+        return new HistoryHeapPayload(services, ordered, date);
+    }
+
     /** 원본 _configured_service_names 1:1. */
     private List<String> configuredServiceNames() {
         List<String> names = new ArrayList<>();

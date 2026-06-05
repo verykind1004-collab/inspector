@@ -40,4 +40,7 @@ public interface HistoryMapper {
 
     /** /labs/api/history-qcnt 1:1 — INSP_QCNT_HISTORY 시계열(start/end timestamp). */
     List<LinkedHashMap<String, Object>> findQcntRange(@Param("start") String start, @Param("end") String end);
+
+    /** /labs/api/history-heap 1:1 — INSP_HEAP_HISTORY 시계열(start/end timestamp). */
+    List<LinkedHashMap<String, Object>> findHeapRange(@Param("start") String start, @Param("end") String end);
 }

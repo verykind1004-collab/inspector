@@ -334,4 +334,43 @@ class HistoryDetailServiceTest {
         assertThat(p.getServices()).isEmpty();
         assertThat(p.getData()).isEmpty();
     }
+
+    // ── api_history_heap ──────────────────────────────────────────────
+
+    private LinkedHashMap<String, Object> heapRowGeneric(String ts, String svc,
+                                                          Double used, Double alloc, Double max) {
+        LinkedHashMap<String, Object> r = new LinkedHashMap<>();
+        r.put("ts", ts); r.put("service_name", svc);
+        r.put("used", used); r.put("alloc", alloc); r.put("max", max);
+        return r;
+    }
+
+    @Test
+    void heapDetail_groupedByService_sortedAlphabetically() {
+        given(mapperProvider.getIfAvailable()).willReturn(mapper);
+        given(mapper.findHeapRange(anyString(), anyString())).willReturn(Arrays.asList(
+                heapRowGeneric("2026-06-05 09:00:00", "PlatformJS",  450.0, 800.0, 2048.0),
+                heapRowGeneric("2026-06-05 09:00:00", "DGServer_M",  300.0, 500.0, 1024.0),
+                heapRowGeneric("2026-06-05 09:01:00", "DGServer_M",  310.0, 500.0, 1024.0)));
+
+        HistoryHeapPayload p = service.heap("2026-06-05", "00:00", "23:59");
+
+        assertThat(p.getServices()).containsExactly("DGServer_M", "PlatformJS");
+        assertThat(p.getData().get("DGServer_M")).hasSize(2);
+        assertThat(p.getData().get("PlatformJS")).hasSize(1);
+        HistoryHeapRow first = p.getData().get("DGServer_M").get(0);
+        assertThat(first.getUsed()).isEqualTo(300.0);
+        assertThat(first.getAlloc()).isEqualTo(500.0);
+        assertThat(first.getMax()).isEqualTo(1024.0);
+    }
+
+    @Test
+    void heapDetail_emptyWhenMapperNull() {
+        given(mapperProvider.getIfAvailable()).willReturn(null);
+
+        HistoryHeapPayload p = service.heap("2026-06-05", "00:00", "23:59");
+
+        assertThat(p.getServices()).isEmpty();
+        assertThat(p.getData()).isEmpty();
+    }
 }

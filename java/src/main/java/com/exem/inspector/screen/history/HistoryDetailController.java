@@ -82,6 +82,22 @@ public class HistoryDetailController {
         }
     }
 
+    /**
+     * {@code GET /labs/api/history-heap?date=YYYY-MM-DD&from=HH:MM&to=HH:MM}.
+     * 원본 api_history_heap 1:1.
+     */
+    @GetMapping("/labs/api/history-heap")
+    public ResponseEntity<ApiResponse<HistoryHeapPayload>> heap(
+            @RequestParam(name = "date", required = false) String date,
+            @RequestParam(name = "from", required = false) String from,
+            @RequestParam(name = "to",   required = false) String to) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(service.heap(date, from, to)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(ApiResponse.error(safeMessage(e)));
+        }
+    }
+
     private static String safeMessage(RuntimeException e) {
         String msg = e.getMessage();
         if (msg == null) {
