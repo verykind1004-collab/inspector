@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exem.inspector.screen.auth.ApmUserListMapper">
+
+  <select id="findByUserId" databaseId="oracle"
+          resultType="com.exem.inspector.screen.auth.ApmUserRow">
+    SELECT password          AS "password",
+           NVL(is_locked, 0) AS "isLocked"
+      FROM apm_user_list
+     WHERE user_id = #{userId}
+  </select>
+
+  <select id="findByUserId" databaseId="postgresql"
+          resultType="com.exem.inspector.screen.auth.ApmUserRow">
+    SELECT password                AS "password",
+           COALESCE(is_locked, 0)  AS "isLocked"
+      FROM apm_user_list
+     WHERE user_id = #{userId}
+  </select>
+</mapper>

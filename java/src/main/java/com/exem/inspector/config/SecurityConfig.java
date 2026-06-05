@@ -56,8 +56,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AdminAuthenticationProvider adminProvider) {
+    public AuthenticationManager authenticationManager(AdminAuthenticationProvider adminProvider, com.exem.inspector.security.RepositoryUserAuthenticationProvider repoProvider) {
         // 현재는 관리자 경로만. DB 사용자 경로 provider 는 리포지토리 설정 이후 추가한다.
-        return new ProviderManager(adminProvider);
+        return new ProviderManager(adminProvider, repoProvider);
     }
 }
