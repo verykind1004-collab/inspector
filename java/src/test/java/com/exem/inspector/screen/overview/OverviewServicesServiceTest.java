@@ -25,7 +25,8 @@ class OverviewServicesServiceTest {
                 cfg,
                 new PortChecker(),
                 new DgServerXmlReader(),
-                new VersionReader());
+                new VersionReader(),
+                new UptimeReader());
     }
 
     private ServiceConfig cfgWith(ServicesBlock services, RepositoryConfig repo) {

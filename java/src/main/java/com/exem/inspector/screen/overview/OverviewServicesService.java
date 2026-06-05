@@ -16,10 +16,10 @@ import com.exem.inspector.config.ServiceConfig;
 import com.exem.inspector.config.ServicesBlock;
 
 /**
- * Overview Services 카드 — DGServer_M / DGServer_S* / PlatformJS / Repo DB.
+ * Overview Services 카드 + /services 페이지 — DGServer_M / DGServer_S* / PlatformJS / Client / Repo DB.
  *
  * <p>원본 overview.py::_services_table_html / page_services / api_services 의
- * 데이터 부분을 그대로 JSON 으로 반환한다(HTML 렌더링은 프런트가 담당).
+ * 데이터 부분을 JSON 으로 반환한다(HTML 렌더링은 프런트가 담당).
  *
  * <p>본 단계 단순화:
  * <ul>
@@ -27,7 +27,8 @@ import com.exem.inspector.config.ServicesBlock;
  *   <li>DGServer 의 gather_port 는 DGServer.xml 에서 직접 파싱</li>
  *   <li>PlatformJS 포트는 일단 8888 기본값(추후 config 도입 시 갱신)</li>
  *   <li>버전은 home/version 파일 우선 — 없으면 "-"</li>
- *   <li>Repo DB = ServiceConfig.repository().ip:port TCP listen 체크</li>
+ *   <li>Repo DB = ServiceConfig.repository().ip:port TCP listen 체크 — uptime 측정 대상 아님</li>
+ *   <li>uptime = port → PID → {@code ps -p PID -o etime=} (원본 동일)</li>
  * </ul>
  */
 @Service
@@ -39,16 +40,19 @@ public class OverviewServicesService {
     private final PortChecker portChecker;
     private final DgServerXmlReader xmlReader;
     private final VersionReader versionReader;
+    private final UptimeReader uptimeReader;
 
     public OverviewServicesService(ServiceConfig serviceConfig, PortChecker portChecker,
-                                   DgServerXmlReader xmlReader, VersionReader versionReader) {
+                                   DgServerXmlReader xmlReader, VersionReader versionReader,
+                                   UptimeReader uptimeReader) {
         this.serviceConfig = serviceConfig;
         this.portChecker = portChecker;
         this.xmlReader = xmlReader;
         this.versionReader = versionReader;
+        this.uptimeReader = uptimeReader;
     }
 
-    /** 응답: {@code {services: [{name, status, port, version, home?}, ...]}}. */
+    /** 응답: {@code {services: [{name, status, port, version, uptime, home?}, ...]}}. */
     public Map<String, Object> services() {
         ServicesBlock cfg = serviceConfig.services();
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -85,6 +89,7 @@ public class OverviewServicesService {
             r.put("status",  "stopped");
             r.put("port",    "-");
             r.put("version", "-");
+            r.put("uptime",  "-");
             r.put("home",    home == null ? "" : home);
             return r;
         }
@@ -93,9 +98,11 @@ public class OverviewServicesService {
         String portStr = xmlReader.readTagValue(xml, "gather_port");
         int port = parsePort(portStr);
         boolean up = port > 0 && portChecker.isListening(port);
+        String pid = up ? portChecker.pidByPort(port) : null;
         r.put("status",  up ? "running" : "stopped");
         r.put("port",    port > 0 ? Integer.toString(port) : "-");
         r.put("version", versionReader.readVersion(homePath));
+        r.put("uptime",  uptimeReader.readUptime(pid));
         r.put("home",    home);
         return r;
     }
@@ -106,9 +113,11 @@ public class OverviewServicesService {
         boolean exists = home != null && !home.trim().isEmpty() && Files.isDirectory(Paths.get(home));
         int port = PLATFORMJS_DEFAULT_PORT;
         boolean up = portChecker.isListening(port);
+        String pid = up ? portChecker.pidByPort(port) : null;
         r.put("status",  up ? "running" : (exists ? "stopped" : "stopped"));
         r.put("port",    Integer.toString(port));
         r.put("version", exists ? versionReader.readVersion(Paths.get(home)) : "-");
+        r.put("uptime",  uptimeReader.readUptime(pid));
         r.put("home",    home == null ? "" : home);
         return r;
     }
@@ -127,7 +136,8 @@ public class OverviewServicesService {
             }
         }
         r.put("version", ver);
-        r.put("home", "");
+        r.put("uptime",  "-");
+        r.put("home",    "");
         return r;
     }
 
@@ -140,6 +150,7 @@ public class OverviewServicesService {
             r.put("status",  "unconfigured");
             r.put("port",    "-");
             r.put("version", "-");
+            r.put("uptime",  "-");
             r.put("home",    "");
             return r;
         }
@@ -152,6 +163,7 @@ public class OverviewServicesService {
         r.put("status",  up ? "running" : "stopped");
         r.put("port",    Integer.toString(port));
         r.put("version", "-");
+        r.put("uptime",  "-");
         r.put("home",    "");
         return r;
     }
