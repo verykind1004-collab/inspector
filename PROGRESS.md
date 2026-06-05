@@ -483,3 +483,27 @@
 
 **검토 보류 (사용자 결정 필요, 이전 세션과 동일 유지)**:
 - Report 페이지 임의 추가물(고객사명/지원제품 contentEditable + Check Resource 12개월표 + STATUS_GROUPS 4그룹)
+
+
+
+## 세션 2026-06-05 후속3 (사용자 피드백 — 임의 추가/누락 정정 + Inspector History 전용 layout 분리)
+
+**사용자 지적 사항 (이번 세션에서 발견된 1:1 위반)**:
+1. Alarm Send History 페이지에 임의 추가물 (부제 <p>, Success/Failed/Skipped 카운트 stat) + 누락 (도움말 ⓘ, Refresh 위치, 컬럼 width, sortable)
+2. **모든 페이지의 도움말 ⓘ 아이콘 시스템 전체 누락** (원본 _HELP dict 28 키 + _help_icon SVG popup)
+3. **Inspector History 전용 layout 누락** — 원본은 일반 사이드바와 별도 사이드바(_history_sidebar) + 별도 topbar(_history_page). 내 React 는 단일 사이드바 안에 섞임
+
+**완료 (FE 3 commits)**:
+- FE 61a3d1e feat(help): _HELP 28 키 + HelpIcon 컴포넌트 + 24 페이지 적용 — 회색 ⓘ + 호버 popup + 클릭 pin (html_helpers.py:_help_icon + _HELP_JS 1:1)
+- FE 087e66e fix(alarm-history): 임의 추가물 제거 (부제, 카운트 stat) + 누락 복원 (도움말 ⓘ, Refresh 위치, 컬럼 width 14/16/13/20/12/12/10%, sortable, MAIL 라벨) (alarm_history.py:313)
+- FE 8c81d95 feat(layout/history): Inspector History 전용 layout + topbar 분리 — 일반 페이지 우상단 [Inspector History][← Labs] 버튼 + History 페이지 전용 사이드바(브랜드 "Inspector / History" + OS/Disk/Process/Summary 4그룹) + History topbar (제목+ⓘ+Back to Inspector+Labs) (history_page.py:_history_sidebar/_history_page 1:1)
+
+**검증 누적 (이번 세션 마감 시점)**:
+- BE: **347 tests PASS** (변경 없음 — 이번 추가는 FE 만)
+- FE: **150 tests PASS** (직전 142 → +8: HelpIcon 0 보정 + Alarm 5→7 + 회귀 0)
+- Lint 0 errors / FE build SUCCESS (5.66s)
+
+**중요 회고 — 다음 세션 1:1 정밀 비교 필수**:
+사용자 명시: "다음 세션에서 원본이랑 정확하게 하나하나 비교할거야 방금같은 이슈가 있으면 절대 안돼."
+이번 세션에서 발견된 3개의 임의 추가/누락은 다음 세션 진입 즉시 모든 페이지에 대해 line-by-line 정밀 비교 필요.
+체크리스트는 다음 세션 진입 메시지 참조 (HANDOFF_NEXT_SESSION.md).
