@@ -406,3 +406,36 @@
 - BE :8083 재기동 (새 클래스 + admin-hash 정본 원복)
 - FE :5173 그대로 유지
 - admin-hash 임시 패치 (`91904d...`) → 정본 (`ffb3ac...`) 복원, `/tmp/application.yml.bak` 정리
+
+
+## 세션 2026-06-05 추가 (Task #4 ConfigDump 전면 재작성)
+
+**완료 (BE 1 + FE 1 commit)**:
+- Task #4 ConfigDump 페이지 전체 재작성 — 원본 page_config_dump 1:1 (config_dump.py:544, 886 lines)
+  - **BE 5756b17** feat(config-dump): Restore 엔드포인트 + 원본 응답 포맷 1:1
+    - 응답 shape 전면 교체 — 원본 api_config_dump 와 1:1: stats / dumpInfo / tables{columns,rows,count} / sequences / jsonContent / sqlContent / filenameBase / dbType
+    - DumpInfo / DumpStats / DumpTable POJO 신규
+    - ConfigRestoreService 신규 — api_config_restore 1:1 (Phase1 DELETE 역순 / Phase2 INSERT 정순 / __PATCH_INSP_RESTORE_ORDER__ / 컬럼 교집합 / DATE/TIMESTAMP coerce / 단일 트랜잭션)
+    - SqlGen 신규 (package-private) — _generate_sql / _sql_literal 1:1, ConfigDumpService 내부에서 sqlContent 직접 생성
+    - SqlDumpService / SqlDumpResult 삭제 (원본 API 가 dump 응답에 sqlContent 포함)
+    - POST /labs/api/config-restore 신설
+    - GET /labs/api/config-dump/menus 유지 (tooltip 상세 데이터)
+    - 테스트: ConfigDumpServiceTest 갱신 + SqlGenTest 신규 + ConfigRestoreServiceTest 신규 (16+15+6=37)
+  - **FE b823a3c** feat(config-dump): 3-카드 레이아웃 (Dump/Restore/Migration) — 원본 1:1
+    - 3 카드 구성: Dump (2 profile cards + tooltip 상세) + Restore (file picker + 결과 표) + Migration Guide (8-step 2-group)
+    - DumpProfileCard / RestorePanel / MigrationGuideCard 신규
+    - DUMP_PROFILES (Instance Dump + Others Dump) / MIGRATION_GROUPS 정적 상수 — 원본 _DUMP_PROFILES 1:1
+    - types: DumpInfo/DumpStats/DumpTable/RestoreResult/RestoreTableResult/DumpProfile/MigrationGroup
+    - hooks: useRunDump 응답 새 shape / useRunRestore 신규 / useGenerateSql 제거
+    - MenuPicker / DumpResults 컴포넌트 삭제 (메뉴 picker 패러다임 폐기)
+    - 테스트: ConfigDumpPage.test.tsx 전면 재작성 (8 케이스) + fixtures 갱신
+  - 라이브 BE 검증: /labs/api/config-dump 응답이 원본 Python 포맷 1:1 (stats/dumpInfo/tables{columns,rows,count}/sequences)
+
+**검증 누적 (이번 세션 마감 시점)**:
+- BE: **327 tests PASS** (직전 326 → +1: 신규 37 - 구 SqlDumpServiceTest 17, 기타 균형)
+- FE: **109 tests PASS** (직전 109 — ConfigDump 신규 8 = 구 ConfigDump 13 - 5, 다른 테스트 일부 차이로 합산 동일)
+- Lint 0 errors / FE build SUCCESS
+
+**남은 작업 (다음 세션 — 큰 분량 1건)**:
+1. **Task #4 History 6 페이지 정밀 비교** — history_page.py 1328줄 + history_views.py 2295줄 → 현재 React HistoryPage.tsx 141줄. 6 페이지(/history/{os/cpu, os/memory, disk/tbs, process/{status,qcnt,heap}, configuration}) 각각 정밀 비교 + 누락 복원. 차트/필터/시계열 데이터 등 미구현 가능성 큼.
+
