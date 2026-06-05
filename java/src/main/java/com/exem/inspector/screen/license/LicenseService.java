@@ -96,6 +96,28 @@ public class LicenseService {
                 evt.events, evt.error);
     }
 
+    /**
+     * License Info 행만 조회 — Report 페이지 등에서 events/instances 불필요할 때 사용.
+     * 조회 실패/미설정 시 null 반환(원본 _get_license_info 동등).
+     */
+    public List<LicenseInfoRow> loadInfoOnly() {
+        LicenseMapper mapper = mapperProvider.getIfAvailable();
+        if (mapper == null) return null;
+        try {
+            List<LinkedHashMap<String, Object>> raw = mapper.findLicenseInfo();
+            if (raw == null || raw.isEmpty()) return null;
+            List<LicenseInfoRow> out = new ArrayList<>(raw.size());
+            for (LinkedHashMap<String, Object> r : raw) {
+                out.add(mapLicenseInfoRow(r));
+            }
+            return out;
+        } catch (RuntimeException e) {
+            log.warn("License Info 조회 실패(report)", e);
+            return null;
+        }
+    }
+
+
     // ── 파일명 파싱 ─────────────────────────────────────────────────────────
 
     /**

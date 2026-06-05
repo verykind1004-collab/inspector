@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import com.exem.inspector.common.db.DbType;
 import com.exem.inspector.config.ServiceConfig;
+import com.exem.inspector.screen.license.LicenseInfoRow;
+import com.exem.inspector.screen.license.LicenseService;
 import com.exem.inspector.screen.overview.OverviewDiskService;
 import com.exem.inspector.screen.overview.OverviewServicesService;
 import com.exem.inspector.screen.overview.ProcReader;
@@ -28,7 +30,7 @@ import com.exem.inspector.screen.overview.ProcReader;
  * (4) Check Status STATUS_GROUPS — 4그룹 × 항목, default OK (서비스 상태 기반 자동 분기 일부)
  *
  * <p>고객사명/지원제품 + 특이사항 + 점검일/엔지니어/고객확인/서명 은 FE contenteditable 영역(서버 데이터 없음).
- * License 카드/Check Status License 행은 원본 페이지에 없으므로 제거.
+ * License 카드 복원(2026-06-05) — 직전 세션 누락 시정. instanceCount 폐기.
  */
 @Service
 public class ReportService {
@@ -42,17 +44,20 @@ public class ReportService {
     private final ProcReader procReader;
     private final OverviewDiskService diskService;
     private final OverviewServicesService servicesService;
+    private final LicenseService licenseService;
 
     public ReportService(ObjectProvider<ReportMapper> mapperProvider,
                          ServiceConfig serviceConfig,
                          ProcReader procReader,
                          OverviewDiskService diskService,
-                         OverviewServicesService servicesService) {
+                         OverviewServicesService servicesService,
+                         LicenseService licenseService) {
         this.mapperProvider = mapperProvider;
         this.serviceConfig = serviceConfig;
         this.procReader = procReader;
         this.diskService = diskService;
         this.servicesService = servicesService;
+        this.licenseService = licenseService;
     }
 
     public ReportPayload build() {
@@ -102,12 +107,8 @@ public class ReportService {
         // ── 2. Disk — Oracle 은 worst tablespace, PG 는 pg disk ──────────────
         DiskAgg disk = aggregateDisk(dbType);
 
-        // ── 3. Instance count (4번째 stat 카드) ──────────────────────────────
-        int instanceCount = 0;
-        if (mapper != null) {
-            try { instanceCount = mapper.countInstances(); }
-            catch (RuntimeException e) { log.warn("instance count 실패", e); }
-        }
+        // ── 3. License (4번째 stat 카드 — 원본 lic_val 로직 1:1) ─────────────
+        String licenseValue = computeLicenseValue();
 
         // ── 4. Services 상태 (내부 사용 — Check Status default 판정용) ───────
         List<Map<String, Object>> services = collectServices();
@@ -124,10 +125,34 @@ public class ReportService {
                 cpuLabel, cpuPct,
                 memLabel, memUsedGb, memTotalGb, memPct,
                 disk.label, disk.usedGb, disk.totalGb, disk.percent,
-                instanceCount,
+                "License", licenseValue,
                 usedYesterdayAvg,
                 monthly,
                 statusGroups);
+    }
+
+    /**
+     * 원본 page_report 의 lic_val 로직 1:1.
+     * - TRIAL 라이선스 발견 시 "TRIAL (D-N)" (없으면 D-?)
+     * - 그 외 라이선스 있으면 "TERM"
+     * - 라이선스 없거나 조회 실패 시 "-"
+     */
+    private String computeLicenseValue() {
+        try {
+            List<LicenseInfoRow> rows = licenseService.loadInfoOnly();
+            if (rows == null || rows.isEmpty()) return "-";
+            for (LicenseInfoRow r : rows) {
+                String lt = r.getLicenseType() == null ? "" : r.getLicenseType().toUpperCase();
+                if ("TRIAL".equals(lt)) {
+                    Integer d = r.getDDay();
+                    return "TRIAL (D-" + (d == null ? "?" : d) + ")";
+                }
+            }
+            return "TERM";
+        } catch (RuntimeException e) {
+            log.warn("license 정보 조회 실패", e);
+            return "-";
+        }
     }
 
     private double[] fallbackCurrent() {

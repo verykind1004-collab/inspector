@@ -5,15 +5,14 @@ import java.util.List;
 /**
  * MaxGauge Daily Report 통합 응답 — 원본 page_report() 1:1 동등.
  *
- * <p>원본 보고서 블록 5개:
- * (1) 4 stat 카드 (CPU/Memory/TBS or Disk/Instances)
+ * <p>원본 보고서 블록:
+ * (1) 4 stat 카드 — CPU / Memory / TBS or Disk / **License** (원본 line 401)
  * (2) 고객사명/지원제품 contenteditable 행 → 서버 데이터 없음(FE 영역)
  * (3) Check Resource 12개월 × 3행 (CPU/Memory/TBS) — INSP_MONTHLY_SUMMARY
  * (4) Check Status STATUS_GROUPS 4그룹 — 토글 가능(클라이언트 사이드)
  * (5) 특이사항 + 점검일/엔지니어/고객확인/서명 — 서버 데이터 없음(FE 영역)
  *
- * <p>License 카드/Check Status License 행은 원본에 없으므로 제거.
- * Services 별도 표도 원본에 없으므로 제거(status 결정은 내부 사용만).
+ * <p>License 카드 복원(2026-06-05) — 직전 세션 누락 시정. instanceCount 필드 폐기.
  */
 public class ReportPayload {
 
@@ -28,7 +27,8 @@ public class ReportPayload {
     private final double diskUsedGb;
     private final double diskTotalGb;
     private final double diskPercent;
-    private final int instanceCount;        // 4번째 stat 카드 (apm_db_info COUNT)
+    private final String licenseLabel;      // 항상 "License"
+    private final String licenseValue;      // "TRIAL (D-N)" / "TERM" / "-" — 원본 lic_val 동등
     private final boolean usedYesterdayAvg; // true 면 INSP_OS_HISTORY 어제 평균
     private final List<MonthlySnapshot> monthly;   // 1~12월, 12개. null 셀은 빈 값
     private final List<StatusGroup> statusGroups;  // 원본 STATUS_GROUPS 4그룹
@@ -37,7 +37,7 @@ public class ReportPayload {
                          String cpuLabel, double cpuPercent,
                          String memLabel, double memUsedGb, double memTotalGb, double memPercent,
                          String diskLabel, double diskUsedGb, double diskTotalGb, double diskPercent,
-                         int instanceCount,
+                         String licenseLabel, String licenseValue,
                          boolean usedYesterdayAvg,
                          List<MonthlySnapshot> monthly,
                          List<StatusGroup> statusGroups) {
@@ -52,7 +52,8 @@ public class ReportPayload {
         this.diskUsedGb = diskUsedGb;
         this.diskTotalGb = diskTotalGb;
         this.diskPercent = diskPercent;
-        this.instanceCount = instanceCount;
+        this.licenseLabel = licenseLabel;
+        this.licenseValue = licenseValue;
         this.usedYesterdayAvg = usedYesterdayAvg;
         this.monthly = monthly;
         this.statusGroups = statusGroups;
@@ -69,7 +70,8 @@ public class ReportPayload {
     public double getDiskUsedGb() { return diskUsedGb; }
     public double getDiskTotalGb() { return diskTotalGb; }
     public double getDiskPercent() { return diskPercent; }
-    public int getInstanceCount() { return instanceCount; }
+    public String getLicenseLabel() { return licenseLabel; }
+    public String getLicenseValue() { return licenseValue; }
     public boolean isUsedYesterdayAvg() { return usedYesterdayAvg; }
     public List<MonthlySnapshot> getMonthly() { return monthly; }
     public List<StatusGroup> getStatusGroups() { return statusGroups; }

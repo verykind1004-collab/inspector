@@ -40,9 +40,10 @@ class ReportServiceTest {
     private final ProcReader procReader = mock(ProcReader.class);
     private final OverviewDiskService diskService = mock(OverviewDiskService.class);
     private final OverviewServicesService servicesService = mock(OverviewServicesService.class);
+    private final com.exem.inspector.screen.license.LicenseService licenseService = mock(com.exem.inspector.screen.license.LicenseService.class);
 
     private final ReportService service = new ReportService(
-            mapperProvider, serviceConfig, procReader, diskService, servicesService);
+            mapperProvider, serviceConfig, procReader, diskService, servicesService, licenseService);
 
     private void wireMapper() {
         given(mapperProvider.getIfAvailable()).willReturn(mapper);
@@ -134,12 +135,12 @@ class ReportServiceTest {
         wireProcReaderFallback();
         wireDiskTbsItems(Arrays.asList(tbsRow(10, 20, 50)));
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(7);
+        // instanceCount 폐기(7)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
 
-        assertThat(p.getInstanceCount()).isEqualTo(7);
+        assertThat(p.getLicenseLabel()).isEqualTo("License");
         // License 관련 getter 가 ReportPayload 에 없음 — 컴파일 단계에서 보장
     }
 
@@ -151,7 +152,7 @@ class ReportServiceTest {
         wireYesterdayAvg(288, 22.5, 60.0, 19.2, 32.0);
         wireDiskTbsItems(Arrays.asList(tbsRow(5, 10, 50)));
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(3);
+        // instanceCount 폐기(3)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
@@ -175,7 +176,7 @@ class ReportServiceTest {
         given(mapper.findYesterdayOsAvg(anyString(), anyString())).willReturn(avg);
         wireDiskTbsItems(Arrays.asList(tbsRow(5, 10, 50)));
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(0);
+        // instanceCount 폐기(0)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
@@ -197,7 +198,7 @@ class ReportServiceTest {
                 tbsRow(80, 100, 80),     // worst
                 tbsRow(50, 100, 50)));
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(1);
+        // instanceCount 폐기(1)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
@@ -215,7 +216,7 @@ class ReportServiceTest {
         wireProcReaderFallback();
         wireDiskPg(50, 200, 25);
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(1);
+        // instanceCount 폐기(1)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
@@ -232,7 +233,7 @@ class ReportServiceTest {
         wireProcReaderFallback();
         wireDiskTbsItems(Arrays.asList(tbsRow(5, 10, 50)));
         wireServices(new ArrayList<>());
-        given(mapper.countInstances()).willReturn(0);
+        // instanceCount 폐기(0)
 
         int year = LocalDate.now().getYear();
         int curMonth = LocalDate.now().getMonthValue();
@@ -279,7 +280,7 @@ class ReportServiceTest {
         wireServices(Arrays.asList(
                 svcRow("DGServer_M", "running"),
                 svcRow("PlatformJS", "stopped")));
-        given(mapper.countInstances()).willReturn(2);
+        // instanceCount 폐기(2)
         wireEmptyMonthly();
 
         ReportPayload p = service.build();
@@ -318,7 +319,7 @@ class ReportServiceTest {
         ReportPayload p = service.build();
 
         assertThat(p.isUsedYesterdayAvg()).isFalse();
-        assertThat(p.getInstanceCount()).isZero();
+        assertThat(p.getLicenseLabel()).isEqualTo("License");
         assertThat(p.getMonthly()).hasSize(12);
     }
 }
