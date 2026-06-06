@@ -4,10 +4,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
@@ -22,24 +24,17 @@ import org.springframework.stereotype.Service;
 import com.exem.inspector.screen.maxspace.dto.InstanceRow;
 import com.exem.inspector.screen.maxspace.dto.ServiceGroupRow;
 import com.exem.inspector.screen.maxspace.dto.TablespaceRow;
+import com.exem.inspector.screen.maxspace.dto.TrendPoint;
 
 /**
  * MaxSpace 메인 서비스 — 원본 tablespace_server.py 의 핵심 함수 1:1.
  *
- * <p>Step 3-1A 범위:
- * <ul>
- *   <li>build_data — 인스턴스별 ts_data fetch, 캐시 (cache_ttl_min, 기본 24h)</li>
- *   <li>getServiceGroups — service_id 기준 grouping</li>
- *   <li>getHealth — 캐시 상태 + 다음 자동 갱신 예정 시각</li>
- *   <li>refresh — 강제 캐시 invalidate + 재빌드</li>
- *   <li>reset — pool/캐시 폐기 (Inspector 가 Repository SAVE 후 호출)</li>
- * </ul>
+ * <p>Step 3-1A: build_data / getServiceGroups / getHealth / refresh / reset.
+ * Step 3-1B (현재): getTrend + 트렌드 캐시 + instMap (인스턴스 → (schema, dbId)).
+ * Step 3-1C: warmup_trends + auto_refresh_loop ({@code @Scheduled}).
  *
- * <p>Step 3-1B 에서 권한 필터 (apm_user_list/apm_users_db_list) + 트렌드 캐시 추가.
- * Step 3-1C 에서 warmup_trends + auto_refresh_loop ({@code @Scheduled}) 추가.
- *
- * <p>DataSource / SqlSessionFactory 는 Inspector BE 가 service_config.json 으로 동적 구성하므로
- * {@link ObjectProvider} 로 lazy 주입. Repository 미구성 상태에서는 health 만 "초기화중"으로 응답.
+ * <p>권한 필터는 Controller 가 {@link MaxSpacePermissionService} 결과로 직접 처리 (원본도
+ * api_data / api_trend 안에서 분기). Service 는 raw 캐시 데이터만 반환.
  */
 @Service
 public class MaxSpaceService {
@@ -55,10 +50,13 @@ public class MaxSpaceService {
     private final ObjectProvider<DataSource> dataSourceProvider;
 
     // ====== 캐시 상태 ======
-    private volatile Map<String, Object> cache;        // { today, dbs[], tablespaces{} }
-    private volatile long cacheTimeMs;                 // 0 = 미빌드
-    private volatile Map<String, int[]> instMap;       // instance_name → [dbId] (Step B 에서 schema 도)
+    private volatile Map<String, Object> cache;            // { today, dbs[], tablespaces{} }
+    private volatile long cacheTimeMs;                     // 0 = 미빌드
+    private volatile Map<String, InstanceInfo> instMap;    // instance_name → (schema, dbId)
     private final Object buildLock = new Object();
+
+    private final Map<String, Map<String, List<Map<String, Object>>>> trendCache = new ConcurrentHashMap<>();
+    private final Map<String, Long> trendCacheTimeMs = new ConcurrentHashMap<>();
 
     public MaxSpaceService(MaxSpaceConfig config,
                            ObjectProvider<SqlSessionFactory> sqlSessionFactoryProvider,
@@ -67,6 +65,17 @@ public class MaxSpaceService {
         this.sqlSessionFactoryProvider = sqlSessionFactoryProvider;
         this.dataSourceProvider = dataSourceProvider;
         this.instMap = Collections.emptyMap();
+    }
+
+    /** 인스턴스 → (schema, dbId) — Service 내부 lookup 전용. */
+    public static final class InstanceInfo {
+        public final String schema;     // PG: 스키마명, Oracle: ""
+        public final int dbId;
+
+        InstanceInfo(String schema, int dbId) {
+            this.schema = schema == null ? "" : schema;
+            this.dbId = dbId;
+        }
     }
 
     // ============================================================
@@ -90,6 +99,43 @@ public class MaxSpaceService {
             this.cacheTimeMs = System.currentTimeMillis();
             return built;
         }
+    }
+
+    /**
+     * 인스턴스 1개의 트렌드 — 캐시 우선. 캐시 미스 시 instMap 에서 (schema, dbId) 찾고
+     * mapper 호출. instMap 도 비어있으면 build_data 한 번 강제.
+     *
+     * @return ts_name 기준 grouping 된 { ts_name: [{date, pct, used, total}] } 형태 — 원본
+     *         get_trend 반환 1:1.
+     */
+    public Map<String, List<Map<String, Object>>> getTrend(String dbName) {
+        long ttlMs = config.getCacheTtlMin() * 60_000L;
+        Map<String, List<Map<String, Object>>> cached = trendCache.get(dbName);
+        Long t = trendCacheTimeMs.get(dbName);
+        if (cached != null && t != null && (System.currentTimeMillis() - t) < ttlMs) {
+            return cached;
+        }
+
+        InstanceInfo info = instMap.get(dbName);
+        if (info == null) {
+            // 캐시에 없으면 build_data 한 번 강제로 부르고 재시도 (원본 api_trend 동일).
+            buildData();
+            info = instMap.get(dbName);
+            if (info == null) {
+                throw new NoSuchInstanceException(dbName);
+            }
+        }
+        return fetchAndCacheTrend(dbName, info.schema, info.dbId);
+    }
+
+    /** instMap 에서 db_name 의 (schema, dbId) 조회 — Controller 의 권한 검증용. */
+    public InstanceInfo lookupInstance(String dbName) {
+        InstanceInfo info = instMap.get(dbName);
+        if (info == null) {
+            buildData();
+            info = instMap.get(dbName);
+        }
+        return info;
     }
 
     /** 서비스 그룹 — service_id 기준 grouping. 원본 get_service_groups 1:1. */
@@ -143,7 +189,7 @@ public class MaxSpaceService {
         cacheNode.put("db_count", dbCount);
 
         Map<String, Object> trendNode = new LinkedHashMap<>();
-        trendNode.put("count", 0);          // Step B 에서 trend 캐시 도입 후 갱신
+        trendNode.put("count", trendCache.size());
         trendNode.put("total", dbCount);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -162,6 +208,8 @@ public class MaxSpaceService {
         synchronized (buildLock) {
             this.cache = null;
             this.cacheTimeMs = 0;
+            trendCache.clear();
+            trendCacheTimeMs.clear();
             Map<String, Object> built = rebuildLocked();
             this.cache = built;
             this.cacheTimeMs = System.currentTimeMillis();
@@ -171,18 +219,18 @@ public class MaxSpaceService {
 
     /** /api/reset — pool/캐시 폐기. token 검증은 Controller. */
     public void reset() {
-        // Inspector BE 의 DataSource 는 service_config.json 변경 시 별도 hook 에서 재구성된다.
-        // MaxSpace 측은 캐시만 폐기. Step C 에서 trend 캐시도 함께 폐기.
         synchronized (buildLock) {
             this.cache = null;
             this.cacheTimeMs = 0;
             this.instMap = Collections.emptyMap();
-            log.info("[maxspace] reset — 캐시 폐기");
+            trendCache.clear();
+            trendCacheTimeMs.clear();
+            log.info("[maxspace] reset — 캐시/instMap/trend 폐기");
         }
     }
 
     // ============================================================
-    // 내부 — buildLock 보유 상태에서 호출
+    // 내부 — buildLock 보유 상태에서 호출 (rebuildLocked)
     // ============================================================
     private Map<String, Object> rebuildLocked() {
         SqlSessionFactory factory = sqlSessionFactoryProvider.getIfAvailable();
@@ -206,7 +254,7 @@ public class MaxSpaceService {
                 }
             }
 
-            Map<String, int[]> newInstMap = new LinkedHashMap<>();
+            Map<String, InstanceInfo> newInstMap = new LinkedHashMap<>();
             List<Map<String, Object>> dbList = new ArrayList<>();
             Map<String, List<TablespaceRow>> tsMap = new LinkedHashMap<>();
 
@@ -219,18 +267,17 @@ public class MaxSpaceService {
                 if (isPg) {
                     schema = schemaMap.get(name == null ? "" : name.toLowerCase(Locale.ROOT));
                     if (schema == null) {
-                        continue;     // 매칭 schema 없으면 skip (원본 fetch_inst 와 동일)
+                        continue;
                     }
                 } else {
-                    schema = "";       // Oracle 은 schema 무시
+                    schema = "";
                 }
-
-                if (schema.length() > 0 && !SAFE_SCHEMA.matcher(schema).matches()) {
+                if (!schema.isEmpty() && !SAFE_SCHEMA.matcher(schema).matches()) {
                     log.warn("[maxspace] 비안전 schema 건너뜀: {}", schema);
                     continue;
                 }
 
-                newInstMap.put(name, new int[]{dbId == null ? -1 : dbId});
+                newInstMap.put(name, new InstanceInfo(schema, dbId == null ? -1 : dbId));
 
                 try {
                     List<TablespaceRow> tsData = mapper.findTablespaceData(schema, dbId == null ? -1 : dbId);
@@ -252,7 +299,7 @@ public class MaxSpaceService {
                     row.put("biz_name", biz);
                     row.put("db_name", name);
                     row.put("db_id", dbId);
-                    row.put("schema", schema == null ? "" : schema);
+                    row.put("schema", schema);
                     row.put("total_gb", round2(totalGb));
                     row.put("used_gb", round2(usedGb));
                     row.put("used_pct_1w", round1(avgW));
@@ -274,7 +321,43 @@ public class MaxSpaceService {
         }
     }
 
-    /** 현재 DataSource 가 PG / Oracle 중 어느 쪽인지 결정. service_config 가 source. */
+    /**
+     * 트렌드 1 회 빌드 + 캐시 적재. row 들을 ts_name 기준 grouping → 원본 get_trend 반환 1:1.
+     */
+    private Map<String, List<Map<String, Object>>> fetchAndCacheTrend(String dbName, String schema, int dbId) {
+        if (!schema.isEmpty() && !SAFE_SCHEMA.matcher(schema).matches()) {
+            throw new IllegalArgumentException("허용되지 않은 스키마명: " + schema);
+        }
+        SqlSessionFactory factory = sqlSessionFactoryProvider.getIfAvailable();
+        if (factory == null) {
+            throw new IllegalStateException(
+                    "Repository DB not configured. Labs → Configuration 에서 설정하세요.");
+        }
+        try (SqlSession session = factory.openSession()) {
+            MaxSpaceMapper mapper = session.getMapper(MaxSpaceMapper.class);
+            List<TrendPoint> rows = mapper.findTrend(schema, dbId);
+            Map<String, List<Map<String, Object>>> trend = new LinkedHashMap<>();
+            for (TrendPoint r : rows) {
+                String ts = r.getTsName();
+                double total = nz(r.getTotalGb());
+                double used = nz(r.getUsedGb());
+                List<Map<String, Object>> series = trend.computeIfAbsent(ts, k -> new ArrayList<>());
+                Map<String, Object> point = new LinkedHashMap<>();
+                point.put("date", r.getSnapDay());
+                point.put("pct", total > 0 ? round2(used / total * 100.0) : 0.0);
+                point.put("used", used);
+                point.put("total", total);
+                series.add(point);
+            }
+            // ConcurrentHashMap 에 적재 — 캐시는 thread-safe.
+            // map immutability 위해 HashMap 으로 한 번 더 감싸지 않고 그대로 둠 (원본도 동일).
+            trendCache.put(dbName, trend);
+            trendCacheTimeMs.put(dbName, System.currentTimeMillis());
+            return trend;
+        }
+    }
+
+    /** 현재 DataSource 가 PG / Oracle 중 어느 쪽인지 결정. */
     private String currentDbType() {
         DataSource ds = dataSourceProvider.getIfAvailable();
         if (ds == null) {
@@ -293,7 +376,7 @@ public class MaxSpaceService {
                 return "postgresql";
             }
         } catch (Exception ignored) {
-            // Hikari 가 아닌 다른 구현 — null 반환
+            // Hikari 외 다른 구현 — null 반환
         }
         return null;
     }
@@ -303,4 +386,13 @@ public class MaxSpaceService {
     private static double round1(double v) { return Math.round(v * 10.0) / 10.0; }
 
     private static double round2(double v) { return Math.round(v * 100.0) / 100.0; }
+
+    /** Controller 가 404 로 변환. */
+    public static class NoSuchInstanceException extends RuntimeException {
+        public NoSuchInstanceException(String name) { super("인스턴스 없음: " + name); }
+    }
+
+    /** 미사용 import 경고 회피용 (HashMap 미사용 시 ConcurrentHashMap 으로만 충분). */
+    @SuppressWarnings("unused")
+    private static final Map<String, Object> _UNUSED_HASHMAP_TYPE = new HashMap<>();
 }

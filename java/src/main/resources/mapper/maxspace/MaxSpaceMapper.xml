@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <!--
-  MaxSpace 매퍼 — 원본 tablespace_server.py 의 4 핵심 쿼리 1:1.
+  MaxSpace 매퍼 — 원본 tablespace_server.py 의 6 핵심 쿼리 1:1.
   PG / Oracle databaseId 분기. PG 의 schema 동적 치환은 ${} 으로 직접 삽입 (호출 측에서
   정규식 검증 후 전달 — _validate_schema 와 동등).
 -->
@@ -82,8 +82,6 @@
 
     <!-- ============================================================
          findTablespaceData — latest snapshot + 1주(w1) + 1개월(m1)
-         원본: get_ts_data 의 CTE 4단 (latest/snap/w1/m1)
-         unit_div: total_space/free_space 가 byte 단위 → /1073741824 → GB
     ============================================================ -->
     <resultMap id="TablespaceRowMap" type="com.exem.inspector.screen.maxspace.dto.TablespaceRow">
         <result property="tsName"     column="ts_name"/>
@@ -205,6 +203,105 @@
           LEFT JOIN m1 ON m1.ts_name = s.ts_name
          WHERE NVL(s.total_gb, 0) > 0
          ORDER BY s.used_gb DESC
+    </select>
+
+    <!-- ============================================================
+         findTrend — 인스턴스 1개의 시계열 (ts_name, snap_day) 단위 total/used
+    ============================================================ -->
+    <resultMap id="TrendPointMap" type="com.exem.inspector.screen.maxspace.dto.TrendPoint">
+        <result property="tsName"   column="ts_name"/>
+        <result property="snapDay"  column="snap_day"/>
+        <result property="totalGb"  column="total_gb"/>
+        <result property="usedGb"   column="used_gb"/>
+    </resultMap>
+
+    <select id="findTrend" databaseId="postgresql" resultMap="TrendPointMap">
+        WITH date_range AS (
+            SELECT MIN(time) AS min_time, MAX(time) AS max_time
+              FROM ${schema}.ora_tablespace_info
+             WHERE db_id = #{dbId}
+        )
+        SELECT
+            tablespace_name                                            AS ts_name,
+            TO_CHAR(time, 'YYYY-MM-DD')                                AS snap_day,
+            ROUND(SUM(ROUND(total_space/1073741824.0, 2))::numeric, 2) AS total_gb,
+            ROUND(SUM(ROUND(total_space/1073741824.0, 2)
+                    - ROUND(free_space/1073741824.0, 2))::numeric, 2)  AS used_gb
+          FROM ${schema}.ora_tablespace_info, date_range
+         WHERE db_id = #{dbId}
+           AND time &gt;= date_range.min_time
+           AND time &lt;= date_range.max_time
+         GROUP BY tablespace_name, TO_CHAR(time, 'YYYY-MM-DD')
+         ORDER BY tablespace_name, snap_day
+    </select>
+
+    <select id="findTrend" databaseId="oracle" resultMap="TrendPointMap">
+        WITH date_range AS (
+            SELECT MIN(time) AS min_time, MAX(time) AS max_time
+              FROM ora_tablespace_info
+             WHERE db_id = #{dbId}
+        )
+        SELECT
+            tablespace_name                                AS ts_name,
+            TO_CHAR(time, 'YYYY-MM-DD')                    AS snap_day,
+            ROUND(SUM(ROUND(total_space/1073741824, 2)), 2) AS total_gb,
+            ROUND(SUM(ROUND(total_space/1073741824, 2)
+                    - ROUND(free_space/1073741824, 2)), 2) AS used_gb
+          FROM ora_tablespace_info, date_range
+         WHERE db_id = #{dbId}
+           AND time &gt;= date_range.min_time
+           AND time &lt;= date_range.max_time
+         GROUP BY tablespace_name, TO_CHAR(time, 'YYYY-MM-DD')
+         ORDER BY tablespace_name, snap_day
+    </select>
+
+    <!-- ============================================================
+         findUserSeqAndAdminRole — 원본 _fetch_user_dbids 첫 조회
+    ============================================================ -->
+    <resultMap id="UserAdminRowMap" type="com.exem.inspector.screen.maxspace.dto.UserAdminRow">
+        <result property="seq"        column="seq"/>
+        <result property="adminRole"  column="admin_role"/>
+    </resultMap>
+
+    <select id="findUserSeqAndAdminRole" databaseId="postgresql" resultMap="UserAdminRowMap">
+        SELECT seq, admin_role
+          FROM public.apm_user_list
+         WHERE user_id = #{userId}
+    </select>
+
+    <select id="findUserSeqAndAdminRole" databaseId="oracle" resultMap="UserAdminRowMap">
+        SELECT seq, admin_role
+          FROM apm_user_list
+         WHERE user_id = #{userId}
+    </select>
+
+    <!-- ============================================================
+         findUserAllowedDbIds — 원본 _fetch_user_dbids 두 번째 조회
+    ============================================================ -->
+    <select id="findUserAllowedDbIds" databaseId="postgresql" resultType="int">
+        SELECT db_id
+          FROM public.apm_users_db_list
+         WHERE seq = #{seq}
+           AND db_id NOT IN ('0','9999')
+           AND (COALESCE(NULLIF(role1,'')::int, 0) &gt;= 1
+             OR COALESCE(NULLIF(role2,'')::int, 0) &gt;= 1
+             OR COALESCE(NULLIF(role3,'')::int, 0) &gt;= 1
+             OR COALESCE(NULLIF(role4,'')::int, 0) &gt;= 1
+             OR COALESCE(NULLIF(role5,'')::int, 0) &gt;= 1
+             OR COALESCE(NULLIF(role6,'')::int, 0) &gt;= 1)
+    </select>
+
+    <select id="findUserAllowedDbIds" databaseId="oracle" resultType="int">
+        SELECT db_id
+          FROM apm_users_db_list
+         WHERE seq = #{seq}
+           AND db_id NOT IN ('0','9999')
+           AND (NVL(TO_NUMBER(role1), 0) &gt;= 1
+             OR NVL(TO_NUMBER(role2), 0) &gt;= 1
+             OR NVL(TO_NUMBER(role3), 0) &gt;= 1
+             OR NVL(TO_NUMBER(role4), 0) &gt;= 1
+             OR NVL(TO_NUMBER(role5), 0) &gt;= 1
+             OR NVL(TO_NUMBER(role6), 0) &gt;= 1)
     </select>
 
 </mapper>
