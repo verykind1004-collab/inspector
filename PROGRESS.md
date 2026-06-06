@@ -507,3 +507,62 @@
 사용자 명시: "다음 세션에서 원본이랑 정확하게 하나하나 비교할거야 방금같은 이슈가 있으면 절대 안돼."
 이번 세션에서 발견된 3개의 임의 추가/누락은 다음 세션 진입 즉시 모든 페이지에 대해 line-by-line 정밀 비교 필요.
 체크리스트는 다음 세션 진입 메시지 참조 (HANDOFF_NEXT_SESSION.md).
+
+
+## 세션 2026-06-06 (BE Phase 3-1A/B/C — MaxSpace 백엔드 풀 구현)
+
+원본 tablespace_server.py (1128 lines) 의 FastAPI endpoint 6 종 + 권한 필터 + 트렌드 캐시 +
+auto_refresh 를 Java/Spring Boot 로 1:1 변환. branch: `setup/foundation`.
+
+**완료 (BE 3 commits)**:
+
+- BE `b89a4f6` feat(maxspace): Phase 3-1A — Controller + Service + Mapper + DTOs + 5 endpoint
+  · screen/maxspace/{Controller, Service, Mapper, Config, dto/×3}.java + mapper/maxspace/MaxSpaceMapper.xml (8 신규)
+  · config/SecurityConfig.java: PUBLIC_PATHS 에 /labs/api/maxspace/refresh, /reset 추가 (token 인증)
+  · 5 endpoint: /labs/api/maxspace/{data, groups, health, refresh(GET), reset(POST)}
+  · 응답 shape 원본 1:1 (ApiResponse 봉투 미사용, Map 직접 반환)
+  · 캐시 lazy invalidation (cache_ttl_min 기본 24h), buildLock 으로 단일 재빌드
+  · PG schema 동적 치환 — Service 에서 ^[a-zA-Z0-9_]+$ 검증 후 ${schema} 삽입
+  · MaxSpaceConfig: tablespace_config.json 로더 (cache_ttl_min/refresh_hour/refresh_minute/refresh_token), 파일 없으면 안전 기본값 + WARN
+
+- BE `7fbe4f2` feat(maxspace): Phase 3-1B — 권한 필터 + /api/trend + 트렌드 캐시
+  · screen/maxspace/MaxSpacePermissionService.java 신규 — SecurityContextHolder 기반 권한 결정
+    - ROLE_ENGINEER → allowAll=true
+    - ROLE_USER → apm_user_list.seq + admin_role 조회 (admin_role≥2 면 allowAll, 그 외 apm_users_db_list role1~6 ≥ 1 인 db_id)
+  · dto/UserAdminRow + TrendPoint 신규
+  · MaxSpaceMapper: findTrend / findUserSeqAndAdminRole / findUserAllowedDbIds 추가 (PG/Oracle 분기 6 select)
+  · MaxSpaceService: getTrend + trendCache (ConcurrentHashMap) + lookupInstance + reset/refresh 시 trend 폐기
+  · MaxSpaceController: /trend?db= endpoint + /data 권한 필터 (dbs[]/tablespaces{} filterByDbIds) + 403/404 분기
+  · 권한 미적용: /groups, /health (원본 동일)
+
+- BE `232fd23` feat(maxspace): Phase 3-1C — warmupTrends + auto_refresh_loop (Spring TaskScheduler Trigger)
+  · screen/maxspace/MaxSpaceScheduleConfig.java 신규 — @EnableScheduling + ThreadPoolTaskScheduler (pool=2, daemon, prefix maxspace-)
+  · screen/maxspace/MaxSpaceScheduler.java 신규 — @PostConstruct warmup async + auto_refresh Trigger
+    - RefreshTrigger.nextExecutionTime: refresh_hour:refresh_minute 까지 대기 (자정 넘으면 다음 day) — config 변경 시 다음 회차 즉시 반영
+  · MaxSpaceService.warmupTrends() public 추가 — ExecutorService(pool=min(8,size)) daemon 병렬, 캐시 hit skip, 끝나면 stale 트렌드 제거
+
+**검증 (BE 3 phase 통합)**:
+- mvn compile SUCCESS — 157 source files (이전 147 + 10 신규)
+- mvn test **335 / 335 PASS** (이전 327 + 8)
+- 라이브 endpoint 도달 확인:
+  · `curl http://localhost:8083/labs/api/maxspace/refresh` (no token) → `{"ok":false,"error":"인증 실패"}` 401
+    = Spring Security PUBLIC_PATHS 통과 + MaxSpaceController.authToken() 도달
+  · `/data`, `/groups`, `/health` 는 Labs 세션 쿠키 인증 후 접근 (라이브 검증은 admin-hash 패치 후)
+
+**미해결**:
+- **admin-hash 정본 ffb3ac 와 `maxgauge/test1!` 매칭 불일치** — login 401
+  · application.yml 의 admin-hash 가 ffb3ac (HEAD 정본)
+  · 이전 세션에는 91904 hash 로 패치되어 있어 maxgauge/test1! 로 로그인 가능했음
+  · 사용자가 test1! 가 정본 비밀번호인지 또는 다른 비밀번호인지 확인 필요
+  · 결과로 BE Phase 3-1 의 라이브 인증 후 endpoint 검증 (data/groups/health/trend) 미수행
+
+**남은 작업**:
+- **Phase 3-2 FE MaxSpacePage** — tablespace_dashboard.html 1894 lines 1:1 (다음 세션)
+  · 3-2A: 골격 + types + api hooks + MaxSpacePage + route + LabsEntryPage navigate 교체 + __root.tsx isMaxSpacePath 분기 (사이드바 X)
+  · 3-2B: 시각 polishing (dark theme + color thresholds + progress bar + sort 화살표)
+  · 3-2C: 고급 인터랙션 (column drag/resize + tooltip + search + group filter)
+
+**세션 가동 상태 (마감 시점)**:
+- BE :8083 (PID 19645, `setup/foundation` 232fd23 빌드)
+- FE Vite :5173 (PID 6150 — 6/2 부터 유지)
+- nginx :14081 (FE PID 24589, dist 12:34 mtime `index-Zicbwvcp.js` = FE 64dfd06 빌드)
