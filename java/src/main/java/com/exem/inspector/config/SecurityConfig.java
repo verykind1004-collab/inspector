@@ -34,7 +34,10 @@ public class SecurityConfig {
             "/labs/api/whoami",
             "/labs/api/check-auth",
             "/labs/api/login",
-            "/labs/api/logout"
+            "/labs/api/logout",
+            // MaxSpace refresh/reset — token 인증으로만 보호 (외부 cron / Inspector SAVE hook)
+            "/labs/api/maxspace/refresh",
+            "/labs/api/maxspace/reset"
     };
 
     @Bean

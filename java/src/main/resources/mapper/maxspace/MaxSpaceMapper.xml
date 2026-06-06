@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  MaxSpace 매퍼 — 원본 tablespace_server.py 의 4 핵심 쿼리 1:1.
+  PG / Oracle databaseId 분기. PG 의 schema 동적 치환은 ${} 으로 직접 삽입 (호출 측에서
+  정규식 검증 후 전달 — _validate_schema 와 동등).
+-->
+<mapper namespace="com.exem.inspector.screen.maxspace.MaxSpaceMapper">
+
+    <!-- ============================================================
+         findTablespaceSchemas — PG: information_schema, Oracle: USER 1개
+    ============================================================ -->
+    <select id="findTablespaceSchemas" databaseId="postgresql" resultType="string">
+        SELECT table_schema
+          FROM information_schema.tables
+         WHERE table_name = 'ora_tablespace_info'
+           AND table_schema NOT IN ('pg_catalog','information_schema','public','insp')
+           AND table_name NOT SIMILAR TO '%_p[0-9]+'
+         ORDER BY table_schema
+    </select>
+
+    <select id="findTablespaceSchemas" databaseId="oracle" resultType="string">
+        SELECT USER FROM dual
+    </select>
+
+    <!-- ============================================================
+         findInstances — apm_db_info
+    ============================================================ -->
+    <resultMap id="InstanceRowMap" type="com.exem.inspector.screen.maxspace.dto.InstanceRow">
+        <result property="dbId"         column="db_id"/>
+        <result property="instanceName" column="instance_name"/>
+        <result property="businessName" column="business_name"/>
+    </resultMap>
+
+    <select id="findInstances" databaseId="postgresql" resultMap="InstanceRowMap">
+        SELECT db_id, instance_name, business_name
+          FROM public.apm_db_info
+         ORDER BY db_id
+    </select>
+
+    <select id="findInstances" databaseId="oracle" resultMap="InstanceRowMap">
+        SELECT db_id, instance_name, business_name
+          FROM apm_db_info
+         ORDER BY db_id
+    </select>
+
+    <!-- ============================================================
+         findServiceGroupRows — ora_service_name × ora_service_info × apm_db_info
+    ============================================================ -->
+    <resultMap id="ServiceGroupRowMap" type="com.exem.inspector.screen.maxspace.dto.ServiceGroupRow">
+        <result property="serviceId"    column="service_id"/>
+        <result property="serviceName"  column="service_name"/>
+        <result property="dbId"         column="db_id"/>
+        <result property="instanceName" column="instance_name"/>
+    </resultMap>
+
+    <select id="findServiceGroupRows" databaseId="postgresql" resultMap="ServiceGroupRowMap">
+        SELECT
+            sn.service_id,
+            sn.name        AS service_name,
+            f.db_id,
+            f.instance_name
+          FROM public.ora_service_name  sn
+          JOIN public.ora_service_info  si ON si.service_id = sn.service_id
+          JOIN public.apm_db_info       f  ON f.db_id = si.db_id
+         ORDER BY sn.service_id, f.instance_name
+    </select>
+
+    <select id="findServiceGroupRows" databaseId="oracle" resultMap="ServiceGroupRowMap">
+        SELECT
+            sn.service_id,
+            sn.name        AS service_name,
+            f.db_id,
+            f.instance_name
+          FROM ora_service_name  sn
+          JOIN ora_service_info  si ON si.service_id = sn.service_id
+          JOIN apm_db_info       f  ON f.db_id = si.db_id
+         ORDER BY sn.service_id, f.instance_name
+    </select>
+
+    <!-- ============================================================
+         findTablespaceData — latest snapshot + 1주(w1) + 1개월(m1)
+         원본: get_ts_data 의 CTE 4단 (latest/snap/w1/m1)
+         unit_div: total_space/free_space 가 byte 단위 → /1073741824 → GB
+    ============================================================ -->
+    <resultMap id="TablespaceRowMap" type="com.exem.inspector.screen.maxspace.dto.TablespaceRow">
+        <result property="tsName"     column="ts_name"/>
+        <result property="totalGb"    column="total_gb"/>
+        <result property="usedGb"     column="used_gb"/>
+        <result property="usedPct1w"  column="used_pct_1w"/>
+        <result property="usedPct1m"  column="used_pct_1m"/>
+    </resultMap>
+
+    <select id="findTablespaceData" databaseId="postgresql" resultMap="TablespaceRowMap">
+        WITH latest AS (
+            SELECT MAX(time) AS max_time
+              FROM ${schema}.ora_tablespace_info WHERE db_id = #{dbId}
+        ),
+        snap AS (
+            SELECT tablespace_name                                  AS ts_name,
+                   SUM(ROUND(total_space/1073741824.0, 2))           AS total_gb,
+                   SUM(ROUND(total_space/1073741824.0, 2)
+                     - ROUND(free_space/1073741824.0, 2))            AS used_gb
+              FROM ${schema}.ora_tablespace_info, latest
+             WHERE db_id = #{dbId} AND time = latest.max_time
+             GROUP BY tablespace_name
+        ),
+        w1 AS (
+            SELECT tablespace_name AS ts_name,
+                   SUM(ROUND(total_space/1073741824.0, 2)
+                     - ROUND(free_space/1073741824.0, 2)) AS used_gb
+              FROM ${schema}.ora_tablespace_info
+             WHERE db_id = #{dbId}
+               AND time = (
+                 SELECT MAX(time) FROM ${schema}.ora_tablespace_info
+                  WHERE db_id = #{dbId}
+                    AND time &lt;= (SELECT max_time - INTERVAL '7 days' FROM latest)
+               )
+             GROUP BY tablespace_name
+        ),
+        m1 AS (
+            SELECT tablespace_name AS ts_name,
+                   SUM(ROUND(total_space/1073741824.0, 2)
+                     - ROUND(free_space/1073741824.0, 2)) AS used_gb
+              FROM ${schema}.ora_tablespace_info
+             WHERE db_id = #{dbId}
+               AND time = (
+                 SELECT MAX(time) FROM ${schema}.ora_tablespace_info
+                  WHERE db_id = #{dbId}
+                    AND time &lt;= (SELECT max_time - INTERVAL '30 days' FROM latest)
+               )
+             GROUP BY tablespace_name
+        )
+        SELECT
+            s.ts_name,
+            COALESCE(s.total_gb, 0) AS total_gb,
+            COALESCE(s.used_gb,  0) AS used_gb,
+            CASE WHEN COALESCE(s.total_gb, 0) > 0
+                 THEN ROUND(COALESCE(w1.used_gb, s.used_gb) / s.total_gb * 100, 1)
+                 ELSE 0 END         AS used_pct_1w,
+            CASE WHEN COALESCE(s.total_gb, 0) > 0
+                 THEN ROUND(COALESCE(m1.used_gb, s.used_gb) / s.total_gb * 100, 1)
+                 ELSE 0 END         AS used_pct_1m
+          FROM snap s
+          LEFT JOIN w1 ON w1.ts_name = s.ts_name
+          LEFT JOIN m1 ON m1.ts_name = s.ts_name
+         WHERE s.total_gb > 0
+         ORDER BY s.used_gb DESC
+    </select>
+
+    <select id="findTablespaceData" databaseId="oracle" resultMap="TablespaceRowMap">
+        WITH latest AS (
+            SELECT MAX(time) AS max_time
+              FROM ora_tablespace_info WHERE db_id = #{dbId}
+        ),
+        snap AS (
+            SELECT tablespace_name                                  AS ts_name,
+                   SUM(ROUND(total_space/1073741824, 2))             AS total_gb,
+                   SUM(ROUND(total_space/1073741824, 2)
+                     - ROUND(free_space/1073741824, 2))              AS used_gb
+              FROM ora_tablespace_info, latest
+             WHERE db_id = #{dbId} AND time = latest.max_time
+             GROUP BY tablespace_name
+        ),
+        w1 AS (
+            SELECT tablespace_name AS ts_name,
+                   SUM(ROUND(total_space/1073741824, 2)
+                     - ROUND(free_space/1073741824, 2)) AS used_gb
+              FROM ora_tablespace_info
+             WHERE db_id = #{dbId}
+               AND time = (
+                 SELECT MAX(time) FROM ora_tablespace_info
+                  WHERE db_id = #{dbId}
+                    AND time &lt;= (SELECT max_time - INTERVAL '7' DAY FROM latest)
+               )
+             GROUP BY tablespace_name
+        ),
+        m1 AS (
+            SELECT tablespace_name AS ts_name,
+                   SUM(ROUND(total_space/1073741824, 2)
+                     - ROUND(free_space/1073741824, 2)) AS used_gb
+              FROM ora_tablespace_info
+             WHERE db_id = #{dbId}
+               AND time = (
+                 SELECT MAX(time) FROM ora_tablespace_info
+                  WHERE db_id = #{dbId}
+                    AND time &lt;= (SELECT max_time - INTERVAL '30' DAY FROM latest)
+               )
+             GROUP BY tablespace_name
+        )
+        SELECT
+            s.ts_name                                       AS ts_name,
+            NVL(s.total_gb, 0)                              AS total_gb,
+            NVL(s.used_gb,  0)                              AS used_gb,
+            CASE WHEN NVL(s.total_gb, 0) > 0
+                 THEN ROUND(NVL(w1.used_gb, s.used_gb) / s.total_gb * 100, 1)
+                 ELSE 0 END                                 AS used_pct_1w,
+            CASE WHEN NVL(s.total_gb, 0) > 0
+                 THEN ROUND(NVL(m1.used_gb, s.used_gb) / s.total_gb * 100, 1)
+                 ELSE 0 END                                 AS used_pct_1m
+          FROM snap s
+          LEFT JOIN w1 ON w1.ts_name = s.ts_name
+          LEFT JOIN m1 ON m1.ts_name = s.ts_name
+         WHERE NVL(s.total_gb, 0) > 0
+         ORDER BY s.used_gb DESC
+    </select>
+
+</mapper>
