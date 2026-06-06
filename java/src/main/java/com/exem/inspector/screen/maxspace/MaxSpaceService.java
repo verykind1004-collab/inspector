@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
@@ -136,6 +139,66 @@ public class MaxSpaceService {
             info = instMap.get(dbName);
         }
         return info;
+    }
+
+    /**
+     * 모든 instance 의 트렌드를 병렬 pre-warm. 원본 warmup_trends 1:1.
+     * build_data 가 아직 미실행이면 한 번 강제 호출. 캐시 hit 인 instance 는 skip.
+     *
+     * <p>실패한 instance 는 로그 + 건너뜀 (원본 except + log). 호출 자체는 throw 안 함.
+     */
+    public void warmupTrends() {
+        try {
+            buildData();
+        } catch (Exception e) {
+            log.warn("[maxspace.warmup] build_data 실패 (Repository 미설정?): {}", e.toString());
+            return;
+        }
+        Map<String, InstanceInfo> snap = this.instMap;
+        if (snap.isEmpty()) {
+            return;
+        }
+        long ttlMs = config.getCacheTtlMin() * 60_000L;
+        ExecutorService pool = Executors.newFixedThreadPool(
+                Math.min(8, Math.max(1, snap.size())),
+                r -> {
+                    Thread t = new Thread(r, "maxspace-warm");
+                    t.setDaemon(true);
+                    return t;
+                });
+        try {
+            List<Future<?>> tasks = new ArrayList<>();
+            for (Map.Entry<String, InstanceInfo> e : snap.entrySet()) {
+                String name = e.getKey();
+                InstanceInfo info = e.getValue();
+                Long t = trendCacheTimeMs.get(name);
+                if (trendCache.containsKey(name) && t != null
+                        && (System.currentTimeMillis() - t) < ttlMs) {
+                    continue;
+                }
+                tasks.add(pool.submit(() -> {
+                    try {
+                        fetchAndCacheTrend(name, info.schema, info.dbId);
+                    } catch (Exception ex) {
+                        log.error("[maxspace.warmup] {} 오류: {}", name, ex.toString());
+                    }
+                }));
+            }
+            for (Future<?> f : tasks) {
+                try {
+                    f.get();
+                } catch (Exception ignored) {
+                    // 개별 오류는 위 람다에서 이미 로그
+                }
+            }
+            // stale 트렌드 제거 — 원본 auto_refresh 후 stale clean 1:1.
+            long now = System.currentTimeMillis();
+            trendCacheTimeMs.entrySet().removeIf(en -> (now - en.getValue()) > ttlMs);
+            trendCache.keySet().retainAll(trendCacheTimeMs.keySet());
+        } finally {
+            pool.shutdown();
+        }
+        log.info("[maxspace.warmup] 트렌드 pre-warm 완료: {} 개", snap.size());
     }
 
     /** 서비스 그룹 — service_id 기준 grouping. 원본 get_service_groups 1:1. */
