@@ -98,17 +98,17 @@
         ),
         snap AS (
             SELECT tablespace_name                                  AS ts_name,
-                   SUM(ROUND(total_space/1073741824.0, 2))           AS total_gb,
-                   SUM(ROUND(total_space/1073741824.0, 2)
-                     - ROUND(free_space/1073741824.0, 2))            AS used_gb
+                   SUM(ROUND(total_space/1024.0, 2))           AS total_gb,
+                   SUM(ROUND(total_space/1024.0, 2)
+                     - ROUND(free_space/1024.0, 2))            AS used_gb
               FROM ${schema}.ora_tablespace_info, latest
              WHERE db_id = #{dbId} AND time = latest.max_time
              GROUP BY tablespace_name
         ),
         w1 AS (
             SELECT tablespace_name AS ts_name,
-                   SUM(ROUND(total_space/1073741824.0, 2)
-                     - ROUND(free_space/1073741824.0, 2)) AS used_gb
+                   SUM(ROUND(total_space/1024.0, 2)
+                     - ROUND(free_space/1024.0, 2)) AS used_gb
               FROM ${schema}.ora_tablespace_info
              WHERE db_id = #{dbId}
                AND time = (
@@ -120,8 +120,8 @@
         ),
         m1 AS (
             SELECT tablespace_name AS ts_name,
-                   SUM(ROUND(total_space/1073741824.0, 2)
-                     - ROUND(free_space/1073741824.0, 2)) AS used_gb
+                   SUM(ROUND(total_space/1024.0, 2)
+                     - ROUND(free_space/1024.0, 2)) AS used_gb
               FROM ${schema}.ora_tablespace_info
              WHERE db_id = #{dbId}
                AND time = (
@@ -155,17 +155,17 @@
         ),
         snap AS (
             SELECT tablespace_name                                  AS ts_name,
-                   SUM(ROUND(total_space/1073741824, 2))             AS total_gb,
-                   SUM(ROUND(total_space/1073741824, 2)
-                     - ROUND(free_space/1073741824, 2))              AS used_gb
+                   SUM(ROUND(total_space/1024, 2))             AS total_gb,
+                   SUM(ROUND(total_space/1024, 2)
+                     - ROUND(free_space/1024, 2))              AS used_gb
               FROM ora_tablespace_info, latest
              WHERE db_id = #{dbId} AND time = latest.max_time
              GROUP BY tablespace_name
         ),
         w1 AS (
             SELECT tablespace_name AS ts_name,
-                   SUM(ROUND(total_space/1073741824, 2)
-                     - ROUND(free_space/1073741824, 2)) AS used_gb
+                   SUM(ROUND(total_space/1024, 2)
+                     - ROUND(free_space/1024, 2)) AS used_gb
               FROM ora_tablespace_info
              WHERE db_id = #{dbId}
                AND time = (
@@ -177,8 +177,8 @@
         ),
         m1 AS (
             SELECT tablespace_name AS ts_name,
-                   SUM(ROUND(total_space/1073741824, 2)
-                     - ROUND(free_space/1073741824, 2)) AS used_gb
+                   SUM(ROUND(total_space/1024, 2)
+                     - ROUND(free_space/1024, 2)) AS used_gb
               FROM ora_tablespace_info
              WHERE db_id = #{dbId}
                AND time = (
@@ -224,9 +224,9 @@
         SELECT
             tablespace_name                                            AS ts_name,
             TO_CHAR(time, 'YYYY-MM-DD')                                AS snap_day,
-            ROUND(SUM(ROUND(total_space/1073741824.0, 2))::numeric, 2) AS total_gb,
-            ROUND(SUM(ROUND(total_space/1073741824.0, 2)
-                    - ROUND(free_space/1073741824.0, 2))::numeric, 2)  AS used_gb
+            ROUND(SUM(ROUND(total_space/1024.0, 2))::numeric, 2) AS total_gb,
+            ROUND(SUM(ROUND(total_space/1024.0, 2)
+                    - ROUND(free_space/1024.0, 2))::numeric, 2)  AS used_gb
           FROM ${schema}.ora_tablespace_info, date_range
          WHERE db_id = #{dbId}
            AND time &gt;= date_range.min_time
@@ -244,9 +244,9 @@
         SELECT
             tablespace_name                                AS ts_name,
             TO_CHAR(time, 'YYYY-MM-DD')                    AS snap_day,
-            ROUND(SUM(ROUND(total_space/1073741824, 2)), 2) AS total_gb,
-            ROUND(SUM(ROUND(total_space/1073741824, 2)
-                    - ROUND(free_space/1073741824, 2)), 2) AS used_gb
+            ROUND(SUM(ROUND(total_space/1024, 2)), 2) AS total_gb,
+            ROUND(SUM(ROUND(total_space/1024, 2)
+                    - ROUND(free_space/1024, 2)), 2) AS used_gb
           FROM ora_tablespace_info, date_range
          WHERE db_id = #{dbId}
            AND time &gt;= date_range.min_time
