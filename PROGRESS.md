@@ -566,3 +566,82 @@ auto_refresh 를 Java/Spring Boot 로 1:1 변환. branch: `setup/foundation`.
 - BE :8083 (PID 19645, `setup/foundation` 232fd23 빌드)
 - FE Vite :5173 (PID 6150 — 6/2 부터 유지)
 - nginx :14081 (FE PID 24589, dist 12:34 mtime `index-Zicbwvcp.js` = FE 64dfd06 빌드)
+
+
+
+## 세션 2026-06-07 (Mapper 단위 변환 fix + admin-hash 해결)
+
+**BE commits**: 1건 (`113cafa` → `745ba09`).
+
+### admin-hash 해결
+
+이전 세션 미해결 — `admin-hash ffb3ac` 와 `maxgauge/test1!` 매칭 불일치 (401).
+
+조사:
+- `AuthProperties.java`: salt = `mxg_inspector_salt_v1`, adminHash = `ffb3ac5ee5445547dc04b542cf7d329efeb0178de4148c2ec8a9a877fb3ed316`
+- `AdminAuthenticationProvider.authenticate`: `sha256(salt + password) == adminHash`
+- 검증: `sha256("mxg_inspector_salt_v1" + "Dprtpa12!@")` = `ffb3ac5ee5445547dc04b542cf7d329efeb0178de4148c2ec8a9a877fb3ed316` ✅
+
+정본 비밀번호: **`maxgauge / Dprtpa12!@`** (사용자 알려줌).
+
+라이브 검증:
+- `POST /labs/api/login {id, password}` → 200 OK + JSESSIONID + `{role:"engineer"}`
+- `GET /labs/api/whoami` (cookie) → 200 OK + `{authenticated:true, role:engineer, dbType:Oracle}`
+- `GET /labs/api/maxspace/data` (cookie) → 200 OK
+
+### commit `745ba09` fix(maxspace) — Mapper 단위 변환
+
+**증상**: `/labs/api/maxspace/data` 가 `{ok:true, data:{today, dbs:[], tablespaces:{}}}` — 빈 응답. BE log: `MaxSpaceService [maxspace] 완료: 0 개 DB`.
+
+**원인**: 데이터는 있음 (Oracle `ora_tablespace_info` 에 db_id=1 의 56행, 2026-04-14~04-21). MaxSpaceMapper.xml 의 SQL 이 단위 변환 잘못 옮김.
+
+원본 `tablespace_server.py::unit_div(col)`:
+- `_gb` 포함 → 그대로
+- `_mb` 또는 `_space` 포함 → `÷1024.0` (KB→MB)
+- 그 외 → `÷1073741824.0` (B→GB)
+
+`total_space` / `free_space` 컬럼명에 `_space` 포함 → `÷1024.0` 이 정답. 그러나 BE Mapper 가 `÷1073741824.0` 로 잘못 옮김 → 8583 KB / 1073741824 = 0.0000079989 → ROUND 2 = 0 → `WHERE s.total_gb > 0` 에서 모든 행 제외.
+
+**수정**: MaxSpaceMapper.xml 의 PG/Oracle 두 분기 20곳 모두 `/1073741824` → `/1024`, `/1073741824.0` → `/1024.0`.
+
+**결과** (재기동 후 라이브):
+```json
+/data: {ok:true, data:{
+  today: "2026-06-06",
+  dbs: [{product:"ORACLE", biz_name:"ORA_2604", db_name:"ORACLE19", db_id:1,
+         total_gb:66.6, used_gb:13.59, used_pct_1w:33.9, used_pct_1m:35.8}],
+  tablespaces: {ORACLE19: [
+    {ts_name:"SYSAUX",    total_gb:6.5,  used_gb:6.19, used_pct_1w:94.5, used_pct_1m:95.2},
+    {ts_name:"USERS",     total_gb:8.38, used_gb:4.48, used_pct_1w:41.3, used_pct_1m:53.5},
+    {ts_name:"SYSTEM",    total_gb:2.87, used_gb:2.85, used_pct_1w:99.0, used_pct_1m:99.3},
+    {ts_name:"UNDOTBS1",  total_gb:14.85,used_gb:0.04, used_pct_1w:0.3,  used_pct_1m:0.3},
+    {ts_name:"EOMDPM_IDX",total_gb:1.0,  used_gb:0.01, used_pct_1w:1.0,  used_pct_1m:1.0},
+    {ts_name:"EOMDPM",    total_gb:1.0,  used_gb:0.01, used_pct_1w:1.0,  used_pct_1m:1.0},
+    {ts_name:"TEMP",      total_gb:32.0, used_gb:0.01, used_pct_1w:0.0,  used_pct_1m:0.0}
+  ]}
+}}
+```
+
+`/health` cache loaded / db_count 1 / trend_cache 1/1.
+
+**근거**: `[[feedback_exact_1to1_no_assumption]]` 위반. mvn test 335 PASS + endpoint 도달 + ApiResponse 형식 일치만 보고 OK 판단했으나 SQL semantics 차이는 mvn test 가 안 잡음. **다음부터 원본 SQL 의 단위 / 조건 / GROUP BY / JOIN 까지 line-by-line 비교 후 BE Mapper 커밋**.
+
+### 가동 상태 (마감 시점 2026-06-07 15:13)
+
+- BE :8083 (PID 24524 — 이번 세션 재기동) `setup/foundation` HEAD `745ba09`
+- 데이터: ORACLE19 1 DB + 7 tablespaces 정상 반환
+- mvn test 335 PASS (이전 세션 결과 — 이번 세션 재시행 미수행)
+
+### git 상태
+
+- BE `setup/foundation`: `745ba09` ← `113cafa` (이번 세션 +1 commit)
+- 누적 미push (GitLab remote 미등록)
+
+### 다음 세션 작업
+
+사용자 명시: 원본 누락 항목 a to z 전수 검증 + 보완 + 지금까지 개발된 거 전수검사.
+
+BE 측 검증 우선순위:
+1. **MaxSpace Mapper SQL 원본 vs BE Java 라인 비교** — 단위 변환 외 다른 누락 점검 (snap/w1/m1 CTE 의 시간 조건, GROUP BY, ORDER BY 등)
+2. **Inspector 전체 페이지의 BE API 1:1 확인** — Python `*_views.py` / `*_api.py` 의 모든 endpoint 가 Java 측에 1:1 매핑되었는지 (응답 키 / 권한 필터 / 에러 처리 / 캐시 / 페이징)
+3. **mvn test 335 PASS 재실행 + 커버리지 확인** — 라이브 데이터 변경 후 회귀 검사
