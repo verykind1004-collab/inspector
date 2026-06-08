@@ -10,14 +10,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.exem.inspector.common.web.ApiResponse;
+import com.exem.inspector.screen.maxspace.MaxSpaceService;
 
 @RestController
 public class ConfigController {
 
     private final ConfigService service;
+    private final MaxSpaceService maxSpaceService;
 
-    public ConfigController(ConfigService service) {
+    public ConfigController(ConfigService service, MaxSpaceService maxSpaceService) {
         this.service = service;
+        this.maxSpaceService = maxSpaceService;
     }
 
     /** GET /labs/api/config — service_config.json 전체 노출. */
@@ -26,11 +29,17 @@ public class ConfigController {
         return ResponseEntity.ok(ApiResponse.ok(service.read()));
     }
 
-    /** POST /labs/api/config — 본문을 service_config.json 으로 저장하고 reload. */
+    /**
+     * POST /labs/api/config — 본문을 service_config.json 으로 저장하고 reload.
+     *
+     * <p>저장 성공 후 MaxSpace 풀/캐시 즉시 무효화 (원본 Inspector.py::_trigger_maxspace_reset 대응).
+     * 원본은 section in (repo, all) 분기로 호출했으나 React 가 root JSON 전체 전송하므로 무조건 호출.
+     */
     @PostMapping("/labs/api/config")
     public ResponseEntity<ApiResponse<Map<String, Object>>> write(@RequestBody(required = false) Map<String, Object> body) {
         try {
             service.write(body);
+            maxSpaceService.reset();
             return ResponseEntity.ok(ApiResponse.ok(java.util.Collections.<String, Object>singletonMap("saved", true)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
